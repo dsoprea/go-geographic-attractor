@@ -2,7 +2,6 @@ package geoattractorparser
 
 import (
     "encoding/csv"
-    "fmt"
     "io"
     "strconv"
 
@@ -96,9 +95,12 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityCb CityCb) (err error) {
         latitudeRaw := record[4]
         longitudeRaw := record[5]
         featureClass := record[6]
-        featureCode := record[7]
         countryCode := record[8]
         populationRaw := record[14]
+
+        if featureClass != "A" {
+            continue
+        }
 
         if populationRaw == "" || populationRaw == "null" {
             continue
@@ -127,17 +129,13 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityCb CityCb) (err error) {
         log.PanicIf(err)
 
         cr := geoattractor.CityRecord{
+            Id:         geonamesId,
             Country:    countryName,
             City:       name,
             Population: population,
             Latitude:   latitude,
             Longitude:  longitude,
         }
-
-        fmt.Printf("CITY: [%s]\n", cr.City)
-        fmt.Printf("COUNTRY: [%s]\n", cr.Country)
-        fmt.Printf("FEATURE: CLASS=[%s] CODE=[%s]\n", featureClass, featureCode)
-        fmt.Printf("\n")
 
         err = cityCb(cr)
         log.PanicIf(err)
