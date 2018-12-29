@@ -1,4 +1,4 @@
-package geoattractorparser
+package geoattractorparse
 
 import (
     "encoding/csv"
