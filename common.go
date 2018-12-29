@@ -6,7 +6,8 @@ import (
 )
 
 var (
-    appPath string
+    appPath     string
+    packagePath string
 )
 
 func init() {

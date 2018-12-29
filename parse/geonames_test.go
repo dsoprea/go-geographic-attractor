@@ -11,7 +11,7 @@ import (
 )
 
 func getCountryMapping() map[string]string {
-    filepath := path.Join(testAssetsPath, "countryInfo.txt")
+    filepath := path.Join(appPath, "test", "asset", "countryInfo.txt")
 
     f, err := os.Open(filepath)
     log.PanicIf(err)
@@ -60,7 +60,7 @@ func TestGeonamesParser_Parse(t *testing.T) {
 
     gp := NewGeonamesParser(countries)
 
-    filepath := path.Join(testAssetsPath, "allCountries.txt.truncated")
+    filepath := path.Join(testAssetsPath, "allCountries.txt.short")
     f, err := os.Open(filepath)
 
     defer f.Close()
@@ -72,8 +72,12 @@ func TestGeonamesParser_Parse(t *testing.T) {
         return nil
     }
 
-    err = gp.Parse(f, cb)
+    recordsCount, err := gp.Parse(f, cb)
     log.PanicIf(err)
+
+    if recordsCount != 1000 {
+        t.Fatalf("Number of records read is not correct: (%d)", recordsCount)
+    }
 
     expected := []string{
         "CityRecord<ID=[3039162] COUNTRY=[Andorra] CITY=[Sant Julià de Lòria] POP=(9448) LAT=(42.4624700000) LON=(1.4824700000)>",

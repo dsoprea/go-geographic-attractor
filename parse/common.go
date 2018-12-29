@@ -6,10 +6,12 @@ import (
 )
 
 var (
-    appPath string
+    appPath     string
+    packagePath string
 )
 
 func init() {
     goPath := os.Getenv("GOPATH")
-    appPath = path.Join(goPath, "src", "github.com", "dsoprea", "go-geographic-attractor", "parse")
+    appPath = path.Join(goPath, "src", "github.com", "dsoprea", "go-geographic-attractor")
+    packagePath = path.Join(appPath, "parse")
 }

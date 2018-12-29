@@ -27,7 +27,11 @@ func BuildGeonamesCountryMapping(r io.Reader) (countries map[string]string, err 
             break
         }
 
-        if len(record) > 0 && len(record[0]) > 0 && record[0][0] == '#' {
+        if len(record) == 1 && record[0] == "" {
+            continue
+        }
+
+        if len(record[0]) > 0 && record[0][0] == '#' {
             continue
         }
 
@@ -50,9 +54,7 @@ func NewGeonamesParser(countries map[string]string) *GeonamesParser {
     }
 }
 
-type CityCb func(cr geoattractor.CityRecord) (err error)
-
-func (gp *GeonamesParser) Parse(r io.Reader, cityCb CityCb) (err error) {
+func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecordCb) (recordsCount int, err error) {
     defer func() {
         if state := recover(); state != nil {
             err = log.Wrap(state.(error))
@@ -67,6 +69,8 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityCb CityCb) (err error) {
         if err == io.EOF {
             break
         }
+
+        recordsCount++
 
         // From http://download.geonames.org/export/dump:
         //
@@ -90,15 +94,34 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityCb CityCb) (err error) {
         // 17: timezone          : the iana timezone id (see file timeZone.txt) varchar(40)
         // 18: modification date : date of last modification in yyyy-MM-dd format
 
+        if len(record) == 1 && record[0] == "" {
+            continue
+        } else if len(record) != 19 {
+            continue
+        }
+
         geonamesId := record[0]
         name := record[1]
         latitudeRaw := record[4]
         longitudeRaw := record[5]
         featureClass := record[6]
+        featureCode := record[7]
         countryCode := record[8]
         populationRaw := record[14]
 
+        // TODO(dustin): !! Consider that we might just take the last, populated administrative decision (of the ADM1, ADM2, ADM3, ADM4 feature-codes) rather than eliminating those of the first ones. The first ones will have different meanings in different countries but perhaps only ADM4, for example, may only be populated with actual cities? We think we might've observed a flaw in this proposed solution, but let's revisit in the future.
+
         if featureClass != "A" {
+            // It's not a political/government boundary.
+
+            continue
+        } else if featureCode == "ADM1" {
+            // It's a state/region/province (not a small-enough division).
+
+            continue
+        } else if featureCode == "ADM2" {
+            // It's a county-type division (in the US; not a small-enough division).
+
             continue
         }
 
@@ -137,9 +160,13 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityCb CityCb) (err error) {
             Longitude:  longitude,
         }
 
-        err = cityCb(cr)
+        err = cityRecordCb(cr)
         log.PanicIf(err)
     }
 
-    return nil
+    return recordsCount, nil
+}
+
+func (gp *GeonamesParser) Name() (name string) {
+    return "GeoNames"
 }

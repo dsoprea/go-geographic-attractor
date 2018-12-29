@@ -1,0 +1,5 @@
+Constructed with:
+
+$ grep Troy allCountries.txt >> index/test/asset/allCountries.txt.detroit_area_handpicked
+$ grep Detroit allCountries.txt >> index/test/asset/allCountries.txt.detroit_area_handpicked
+$ grep Clawson allCountries.txt >> index/test/asset/allCountries.txt.detroit_area_handpicked

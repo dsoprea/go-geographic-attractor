@@ -9,5 +9,5 @@ var (
 )
 
 func init() {
-	testAssetsPath = path.Join(appPath, "test", "asset")
+	testAssetsPath = path.Join(packagePath, "test", "asset")
 }
