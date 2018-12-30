@@ -61,7 +61,9 @@ func TestGeonamesParser_Parse(t *testing.T) {
     gp := NewGeonamesParser(countries)
 
     filepath := path.Join(testAssetsPath, "allCountries.txt.short")
+
     f, err := os.Open(filepath)
+    log.PanicIf(err)
 
     defer f.Close()
 
@@ -75,13 +77,13 @@ func TestGeonamesParser_Parse(t *testing.T) {
     recordsCount, err := gp.Parse(f, cb)
     log.PanicIf(err)
 
-    if recordsCount != 1000 {
+    if recordsCount != 10000 {
         t.Fatalf("Number of records read is not correct: (%d)", recordsCount)
     }
 
     expected := []string{
-        "CityRecord<ID=[3039162] COUNTRY=[Andorra] CITY=[Sant Julià de Lòria] POP=(9448) LAT=(42.4624700000) LON=(1.4824700000)>",
-        "CityRecord<ID=[3039676] COUNTRY=[Andorra] CITY=[Ordino] POP=(3467) LAT=(42.5975800000) LON=(1.5257300000)>",
+        "CityRecord<ID=[3041565] COUNTRY=[Andorra] CITY=[Principality of Andorra] POP=(84000) LAT=(42.5500000000) LON=(1.5833300000)>",
+        "CityRecord<ID=[290557] COUNTRY=[United Arab Emirates] CITY=[United Arab Emirates] POP=(4975593) LAT=(23.7500000000) LON=(54.5000000000)>",
     }
 
     if reflect.DeepEqual(actual, expected) == false {

@@ -18,6 +18,7 @@ func getCityIndex(citydataFilepath string) *CityIndex {
         if state := recover(); state != nil {
             err := log.Wrap(state.(error))
             log.PrintError(err)
+            panic(err)
         }
     }()
 
@@ -51,56 +52,83 @@ func getCityIndex(citydataFilepath string) *CityIndex {
 }
 
 func TestCityIndex_Load(t *testing.T) {
-    ci := getCityIndex(path.Join(appPath, "test", "asset", "countryInfo.txt"))
+    ci := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
 
     ls := ci.Stats()
     if ls.UnfilteredRecords != 100000 {
         t.Fatalf("The number of unfiltered records is not correct: (%d)", ls.UnfilteredRecords)
-    } else if ls.RecordAdds != 3511 {
+    } else if ls.RecordAdds != 281 {
         t.Fatalf("The number of added records is not correct: (%d)", ls.RecordAdds)
-    } else if ls.RecordUpdates != 67 {
+    } else if ls.RecordUpdates != 2 {
         t.Fatalf("The number of updated records is not correct: (%d)", ls.RecordUpdates)
     }
 }
 
-// TODO(dustin): !! Debug this.
+func dumpVisits(visits []VisitHistoryItem) {
+    for _, vhi := range visits {
+        fmt.Printf("%s: %s\n", vhi.Token, vhi.City)
+    }
+}
 
-// func TestCityIndex_Nearest_WithinSameCity(t *testing.T) {
-//     ci := getCityIndex(path.Join(appPath, "test", "asset", "countryInfo.txt"))
+func TestCityIndex_Nearest_Miss(t *testing.T) {
+    defer func() {
+        if state := recover(); state != nil {
+            err := log.Wrap(state.(error))
+            log.PrintError(err)
+            t.Fatalf("Panic.")
+        }
+    }()
 
-//     anguillaCoordinates := []float64{18.21533, -63.02123}
-//     nearHotelCoordinates := []float64{18.216706, -63.020533}
-//     nearBusinessCoordinates := []float64{18.219121, -63.015356}
+    ci := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
 
-//     sourceName1, cr1, err := ci.Nearest(anguillaCoordinates[0], anguillaCoordinates[1])
-//     log.PanicIf(err)
+    lasvegasCoordinates := []float64{36.175, -115.136389}
 
-//     if sourceName1 != "GeoNames" {
-//         t.Fatalf("Source-name for search (1) is not correct: [%s]", sourceName1)
-//     } else if cr1.Id != "11205444" {
-//         t.Fatalf("ID for search (1) is not correct: [%s]", cr1.Id)
-//     }
+    _, _, _, err := ci.Nearest(lasvegasCoordinates[0], lasvegasCoordinates[1])
+    if err == nil {
+        t.Fatalf("Expected not-found error for Las Vegas (no error).")
+    } else if log.Is(err, ErrNoNearestCity) == false {
+        t.Fatalf("Expected not-found error for Las Vegas (error is not right type): [%s]", err)
+    }
+}
 
-//     sourceName2, cr2, err := ci.Nearest(nearHotelCoordinates[0], nearHotelCoordinates[1])
-//     log.PanicIf(err)
+// TestCityIndex_Nearest_MultipleWithinSameCity just tests that multiple local
+// points resolve to that same city. It's not profound.
+func TestCityIndex_Nearest_MultipleWithinSameCity(t *testing.T) {
+    ci := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
 
-//     if sourceName2 != sourceName1 {
-//         t.Fatalf("Source-name for search (2) is not correct: [%s]", sourceName2)
-//     } else if cr2.Id != cr1.Id {
-//         t.Fatalf("ID for search (2) is not correct: [%s]", cr2.Id)
-//     }
+    anguillaCoordinates := []float64{18.21533, -63.02123}
+    nearHotelCoordinates := []float64{18.216706, -63.020533}
+    nearBusinessCoordinates := []float64{18.219121, -63.015356}
 
-//     sourceName3, cr3, err := ci.Nearest(nearBusinessCoordinates[0], nearBusinessCoordinates[1])
-//     log.PanicIf(err)
+    sourceName1, _, cr1, err := ci.Nearest(anguillaCoordinates[0], anguillaCoordinates[1])
+    log.PanicIf(err)
 
-//     if sourceName3 != sourceName1 {
-//         t.Fatalf("Source-name for search (3) is not correct: [%s]", sourceName3)
-//     } else if cr3.Id != cr1.Id {
-//         t.Fatalf("ID for search (3) is not correct: [%s]", cr3.Id)
-//     }
-// }
+    if sourceName1 != "GeoNames" {
+        t.Fatalf("Source-name for search (1) is not correct: [%s]", sourceName1)
+    } else if cr1.Id != "3573511" {
+        t.Fatalf("ID for search (1) is not correct: [%s]", cr1.Id)
+    }
 
-func TestCityIndex_Nearest_NearUrbanArea_One(t *testing.T) {
+    sourceName2, _, cr2, err := ci.Nearest(nearHotelCoordinates[0], nearHotelCoordinates[1])
+    log.PanicIf(err)
+
+    if sourceName2 != sourceName1 {
+        t.Fatalf("Source-name for search (2) is not correct: [%s]", sourceName2)
+    } else if cr2.Id != cr1.Id {
+        t.Fatalf("ID for search (2) is not correct: [%s]", cr2.Id)
+    }
+
+    sourceName3, _, cr3, err := ci.Nearest(nearBusinessCoordinates[0], nearBusinessCoordinates[1])
+    log.PanicIf(err)
+
+    if sourceName3 != sourceName1 {
+        t.Fatalf("Source-name for search (3) is not correct: [%s]", sourceName3)
+    } else if cr3.Id != cr1.Id {
+        t.Fatalf("ID for search (3) is not correct: [%s]", cr3.Id)
+    }
+}
+
+func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
     ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
 
     clawsonCoordinates := []float64{42.53667, -83.15041}
@@ -155,59 +183,41 @@ func TestCityIndex_Nearest_NearUrbanArea_One(t *testing.T) {
     }
 }
 
-// func TestCityIndex_Nearest_NearUrbanArea_Many(t *testing.T) {
-//     ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
+func TestCityIndex_Nearest_NearSmallAndNotNearLarge(t *testing.T) {
+    ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
 
-//     // uniques := make(map[string]geoattractor.CityRecord)
-//     // for _, ie := range ci.index {
-//     //     uniques[ie.LeafCellToken] = ie.Info
-//     // }
+    trentonCoordinates := []float64{42.135582, -83.1928263}
 
-//     // for _, cr := range uniques {
-//     //     if cr.Population > 100000 {
-//     //         fmt.Printf("%s\n", cr)
-//     //     }
-//     // }
+    sourceName, visits, cr, err := ci.Nearest(trentonCoordinates[0], trentonCoordinates[1])
+    log.PanicIf(err)
 
-//     clawsonCoordinates := []float64{42.533333, -83.146389}
+    // We should get Trenton in response (no large urban areas).
+    if sourceName != "GeoNames" {
+        t.Fatalf("Source-name for search is not correct: [%s]", sourceName)
+    } else if cr.Id != "5012524" {
+        t.Fatalf("ID for search is not correct: [%s]", cr.Id)
+    }
 
-//     // nearHotelCoordinates := []float64{18.216706, -63.020533}
-//     // nearBusinessCoordinates := []float64{18.219121, -63.015356}
+    if len(visits) != 7 {
+        t.Fatalf("Number of visits not correct: (%d)", len(visits))
+    }
 
-//     sourceName1, visits, cr1, err := ci.Nearest(clawsonCoordinates[0], clawsonCoordinates[1])
-//     log.PanicIf(err)
+    actual := make([]string, len(visits))
+    for i, vhi := range visits {
+        actual[i] = fmt.Sprintf("%s: %s", vhi.Token, vhi.City)
+    }
 
-//     for _, vh := range visits {
-//         fmt.Printf("%s\n", vh)
-//     }
+    expected := []string{
+        "883b3914: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
+        "883b391: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
+        "883b394: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
+        "883b39: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
+        "883b3c: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
+        "883b3: CityRecord<ID=[4990516] COUNTRY=[United States] CITY=[City of Dearborn] POP=(98153) LAT=(42.3126900000) LON=(-83.2129400000)>",
+        "883b4: CityRecord<ID=[4990516] COUNTRY=[United States] CITY=[City of Dearborn] POP=(98153) LAT=(42.3126900000) LON=(-83.2129400000)>",
+    }
 
-//     fmt.Printf("\n")
-
-//     // NOTE(dustin): !! Why isn't Warren being visited prior to Detroit?
-
-//     if sourceName1 != "GeoNames" {
-//         t.Fatalf("Source-name for search (1) is not correct: [%s]", sourceName1)
-//         // } else if cr1.Id != "11205444" {
-//         //     t.Fatalf("ID for search (1) is not correct: [%s]", cr1.Id)
-//     }
-
-//     fmt.Printf("%s\n", cr1)
-
-//     // sourceName2, cr2, err := ci.Nearest(nearHotelCoordinates[0], nearHotelCoordinates[1])
-//     // log.PanicIf(err)
-
-//     // if sourceName2 != sourceName1 {
-//     //     t.Fatalf("Source-name for search (2) is not correct: [%s]", sourceName2)
-//     // } else if cr2.Id != cr1.Id {
-//     //     t.Fatalf("ID for search (2) is not correct: [%s]", cr2.Id)
-//     // }
-
-//     // sourceName3, cr3, err := ci.Nearest(nearBusinessCoordinates[0], nearBusinessCoordinates[1])
-//     // log.PanicIf(err)
-
-//     // if sourceName3 != sourceName1 {
-//     //     t.Fatalf("Source-name for search (3) is not correct: [%s]", sourceName3)
-//     // } else if cr3.Id != cr1.Id {
-//     //     t.Fatalf("ID for search (3) is not correct: [%s]", cr3.Id)
-//     // }
-// }
+    if reflect.DeepEqual(actual, expected) == false {
+        t.Fatalf("Visit history not correct.")
+    }
+}

@@ -96,11 +96,21 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
 
         if len(record) == 1 && record[0] == "" {
             continue
+        } else if record[0][0] == '#' {
+            continue
         } else if len(record) != 19 {
             continue
         }
 
         geonamesId := record[0]
+
+        // We've accidentally fed-in the country-list by accident so many times
+        // that now we're just protecting against it.
+        _, err = strconv.ParseUint(geonamesId, 10, 64)
+        if err != nil {
+            log.Panicf("first column doesn't look like an integer; are we looking at the right kind of file? %s", record)
+        }
+
         name := record[1]
         latitudeRaw := record[4]
         longitudeRaw := record[5]
