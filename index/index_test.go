@@ -222,7 +222,7 @@ func TestCityIndex_Nearest_NearSmallAndNotNearLarge(t *testing.T) {
     }
 }
 
-func ExampleCityIndex_Nearest_AttractToLarge() {
+func ExampleCityIndex_Nearest() {
     ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
 
     clawsonCoordinates := []float64{42.53667, -83.15041}
