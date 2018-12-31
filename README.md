@@ -4,7 +4,7 @@
 
 # Overview
 
-Produces the nearest major city to a given coordinate.
+Identifies the nearest major city to a given coordinate.
 
 
 # Details
