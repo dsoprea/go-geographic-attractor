@@ -13,7 +13,7 @@ import (
     "github.com/dsoprea/go-geographic-attractor/parse"
 )
 
-func getCityIndex(citydataFilepath string) *CityIndex {
+func getCityIndex(cityDataFilepath string) *CityIndex {
     defer func() {
         if state := recover(); state != nil {
             err := log.Wrap(state.(error))
@@ -24,9 +24,9 @@ func getCityIndex(citydataFilepath string) *CityIndex {
 
     // Load countries.
 
-    countrydataFilepath := path.Join(appPath, "test", "asset", "countryInfo.txt")
+    countryDataFilepath := path.Join(appPath, "test", "asset", "countryInfo.txt")
 
-    f, err := os.Open(countrydataFilepath)
+    f, err := os.Open(countryDataFilepath)
     log.PanicIf(err)
 
     defer f.Close()
@@ -38,7 +38,7 @@ func getCityIndex(citydataFilepath string) *CityIndex {
 
     gp := geoattractorparse.NewGeonamesParser(countries)
 
-    g, err := os.Open(citydataFilepath)
+    g, err := os.Open(cityDataFilepath)
     log.PanicIf(err)
 
     defer g.Close()
@@ -221,12 +221,41 @@ func TestCityIndex_Nearest_NearSmallAndNotNearLarge(t *testing.T) {
 }
 
 func ExampleCityIndex_Nearest() {
-    ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
+    // Load countries.
+
+    countryDataFilepath := path.Join(appPath, "test", "asset", "countryInfo.txt")
+
+    f, err := os.Open(countryDataFilepath)
+    log.PanicIf(err)
+
+    defer f.Close()
+
+    countries, err := geoattractorparse.BuildGeonamesCountryMapping(f)
+    log.PanicIf(err)
+
+    // Load cities.
+
+    gp := geoattractorparse.NewGeonamesParser(countries)
+
+    cityDataFilepath := path.Join(appPath, "index", "test", "asset", "allCountries.txt.detroit_area_handpicked")
+    g, err := os.Open(cityDataFilepath)
+    log.PanicIf(err)
+
+    defer g.Close()
+
+    ci := NewCityIndex()
+
+    err = ci.Load(gp, g)
+    log.PanicIf(err)
+
+    // Do the query.
 
     clawsonCoordinates := []float64{42.53667, -83.15041}
 
     sourceName, visits, cr, err := ci.Nearest(clawsonCoordinates[0], clawsonCoordinates[1])
     log.PanicIf(err)
+
+    // Print the results.
 
     for _, vhi := range visits {
         fmt.Printf("%s: %s\n", vhi.Token, vhi.City)
