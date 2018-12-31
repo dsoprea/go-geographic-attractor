@@ -18,7 +18,7 @@ This algorithm looks to within, approximately, thirty to forty miles of the give
 
 Due to how the cells are calculated, this is only an approximation and the nearest city may sometimes be biased a little north/south/west/east of what you were expecting. However, the algorithm is very, very efficient and reduces a problem that is traditionally solved via clustering (very expensive) to a string-prefix search.
 
-In other words, this algorithm is what you want if you can accept some minor approximation errors in exchange for instanteous searches rather than crunching numbers distributed across a cluster.
+In other words, this algorithm is what you want if you can accept some minor approximation errors in exchange for instanteous searches rather than requiring a clusterized algorithm.
 
 
 # Requirements
