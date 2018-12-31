@@ -55,9 +55,7 @@ func TestCityIndex_Load(t *testing.T) {
     ci := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
 
     ls := ci.Stats()
-    if ls.UnfilteredRecords != 100000 {
-        t.Fatalf("The number of unfiltered records is not correct: (%d)", ls.UnfilteredRecords)
-    } else if ls.RecordAdds != 281 {
+    if ls.RecordAdds != 281 {
         t.Fatalf("The number of added records is not correct: (%d)", ls.RecordAdds)
     } else if ls.RecordUpdates != 2 {
         t.Fatalf("The number of updated records is not correct: (%d)", ls.RecordUpdates)

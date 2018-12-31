@@ -95,11 +95,13 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
         // 17: timezone          : the iana timezone id (see file timeZone.txt) varchar(40)
         // 18: modification date : date of last modification in yyyy-MM-dd format
 
-        if len(record) == 1 && record[0] == "" {
+        if len(record) != 19 {
+            // A line that doesn't look like a record.
+
             continue
-        } else if record[0][0] == '#' {
-            continue
-        } else if len(record) != 19 {
+        } else if len(record[0]) > 0 && record[0][0] == '#' {
+            // A commented line that was somehow interpreted as a record..
+
             continue
         }
 

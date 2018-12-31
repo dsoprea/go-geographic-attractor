@@ -16,21 +16,15 @@ This algorithm looks to within, approximately, thirty to forty miles of the give
 
 # Algorithm Notes
 
-Due to how the cells are calculate, this is only an approximation and the nearest city may sometimes be biased a little left/right/up/down of what you were expecting, but this is very, very efficient and reduces a problem that is traditionally solved via clustering (which is very expensive) to a string-prefix search.
+Due to how the cells are calculated, this is only an approximation and the nearest city may sometimes be biased a little north/south/west/east of what you were expecting. However, the algorithm is very, very efficient and reduces a problem that is traditionally solved via clustering (very expensive) to a string-prefix search.
 
-TLDR: This algorithm is what you want if you can accept some minor approximation errors in exchange for instanteous searches rather than crunching numbers distributed across a cluster.
+In other words, this algorithm is what you want if you can accept some minor approximation errors in exchange for instanteous searches rather than crunching numbers distributed across a cluster.
 
 
 # Requirements
 
-- A supported dataset. Currently, only [GeoNames](https://www.geonames.org) is supported (under "Download" -> "[Free Gazetteer Data](http://download.geonames.org/export/dump)"). Specifically, the "countryInfo.txt" and "allCountries.zip" files.
+- A supported dataset. Currently, only [GeoNames](https://www.geonames.org) is supported. Browse to "Download" -> "[Free Gazetteer Data](http://download.geonames.org/export/dump)". Specifically, we require "countryInfo.txt" and "allCountries.zip" files.
 
-
-# Get
-
-```
-$ go get -t github.com/dsoprea/go-geographic-attractor
-```
 
 # Usage
 
@@ -39,7 +33,7 @@ For usage examples, see the examples at [GoDoc](https://godoc.org/github.com/dso
 
 # Tool
 
-A command-line tool is also provided in order to test the index. This will load the index and then perform the search.
+A command-line tool is also provided in order to test the index. This will load the index and then perform the search. As the index exists in memory, this is done at the top of every execution.
 
 
 ## Install
@@ -83,7 +77,7 @@ user	0m28.365s
 sys	0m0.346s
 ```
 
-Print with increased verbosity. Specifically, this will print the concentric cells that are checked as we move from the smallest cell (longer S2 cell IDs representing smaller, specific cells containing the nearest city to the given coordinates) outwards to larger cells (smaller S2 cell IDs representing larger areas):
+Print with increased verbosity. Specifically, this will print the concentric cells that are checked as we move from the smallest cell (with longer S2 cell IDs representing smaller, specific cells containing the nearest city to the given coordinates) outwards to larger cells (with smaller S2 cell IDs representing larger areas):
 
 ```
 $ $GOPATH/bin/find_nearest_city --latitude 25.648315 --longitude -80.314120 --country-data-filepath countryInfo.txt --city-data-filepath allCountries.zip --verbose
