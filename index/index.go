@@ -43,15 +43,15 @@ type indexEntry struct {
 type LoadStats struct {
     // UnfilteredRecords is the total number of records that were seen in the
     // file before any filtering was applied.
-    UnfilteredRecords int
+    UnfilteredRecords int `json:"unfiltered_records_parsed"`
 
     // RecordAdds are the number of new records committed to the index for new
     // cells/levels.
-    RecordAdds int
+    RecordAdds int `json:"records_added_to_index"`
 
     // RecordUpdates are the number of records that replaced existing ones
     // (mutually exclusively with RecordAdds).
-    RecordUpdates int
+    RecordUpdates int `json:"records_updated_in_index"`
 }
 
 func (ls LoadStats) String() string {

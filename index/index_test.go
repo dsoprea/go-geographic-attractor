@@ -221,3 +221,60 @@ func TestCityIndex_Nearest_NearSmallAndNotNearLarge(t *testing.T) {
         t.Fatalf("Visit history not correct.")
     }
 }
+
+func ExampleCityIndex_Nearest_AttractToLarge() {
+    ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
+
+    clawsonCoordinates := []float64{42.53667, -83.15041}
+
+    sourceName, visits, cr, err := ci.Nearest(clawsonCoordinates[0], clawsonCoordinates[1])
+    log.PanicIf(err)
+
+    for _, vhi := range visits {
+        fmt.Printf("%s: %s\n", vhi.Token, vhi.City)
+    }
+
+    fmt.Printf("\n")
+
+    fmt.Printf("Source: %s\n", sourceName)
+    fmt.Printf("ID: %s\n", cr.Id)
+    fmt.Printf("Country: %s\n", cr.Country)
+    fmt.Printf("City: %s\n", cr.City)
+    fmt.Printf("Population: %d\n", cr.Population)
+    fmt.Printf("Latitude: %.10f\n", cr.Latitude)
+    fmt.Printf("Longitude: %.10f\n", cr.Longitude)
+
+    // Output:
+    // 8824c5ce97677fc5: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce97677fc4: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce97677fd: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce97677fc: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce97677f: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce97677c: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce97677: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce97674: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce9767: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce9764: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce977: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce974: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce97: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce94: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5ce9: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5cec: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5cf: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5cc: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5d: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
+    // 8824c5c: CityRecord<ID=[5007808] COUNTRY=[United States] CITY=[City of Royal Oak] POP=(57236) LAT=(42.5084000000) LON=(-83.1538700000)>
+    // 8824c5: CityRecord<ID=[5007808] COUNTRY=[United States] CITY=[City of Royal Oak] POP=(57236) LAT=(42.5084000000) LON=(-83.1538700000)>
+    // 8824c4: CityRecord<ID=[5012643] COUNTRY=[United States] CITY=[City of Troy] POP=(80980) LAT=(42.5817300000) LON=(-83.1457500000)>
+    // 8824d: CityRecord<ID=[4990752] COUNTRY=[United States] CITY=[City of Detroit] POP=(713777) LAT=(42.3834100000) LON=(-83.1024100000)>
+    // 8824c: CityRecord<ID=[4990752] COUNTRY=[United States] CITY=[City of Detroit] POP=(713777) LAT=(42.3834100000) LON=(-83.1024100000)>
+    //
+    // Source: GeoNames
+    // ID: 4990752
+    // Country: United States
+    // City: City of Detroit
+    // Population: 713777
+    // Latitude: 42.3834100000
+    // Longitude: -83.1024100000
+}

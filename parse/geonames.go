@@ -2,6 +2,7 @@ package geoattractorparse
 
 import (
     "encoding/csv"
+    "fmt"
     "io"
     "strconv"
 
@@ -119,8 +120,26 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
         countryCode := record[8]
         populationRaw := record[14]
 
+        // In the case (name == "Commonwealth of Independent States").
+        if countryCode == "" {
+            continue
+        }
+
         // TODO(dustin): !! Consider that we might just take the last, populated administrative decision (of the ADM1, ADM2, ADM3, ADM4 feature-codes) rather than eliminating those of the first ones. The first ones will have different meanings in different countries but perhaps only ADM4, for example, may only be populated with actual cities? We think we might've observed a flaw in this proposed solution, but let's revisit in the future.
 
+        dumpRecord := func() {
+            fmt.Printf("\n")
+            fmt.Printf("RECORD\n")
+            fmt.Printf("======\n")
+
+            for i, part := range record {
+                fmt.Printf("%02d: [%s] (%d)\n", i, part, len(part))
+            }
+
+            fmt.Printf("\n")
+        }
+
+        // TODO(dustin): !! Move these out to a configurable filer.
         if featureClass != "A" {
             // It's not a political/government boundary.
 
@@ -152,7 +171,9 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
 
         countryName, found := gp.countries[countryCode]
         if found == false {
-            log.Panicf("could not resolve country with code [%s]", countryCode)
+            dumpRecord()
+
+            log.Panicf("could not resolve country with code [%s] ((%d) countries known)", countryCode, len(gp.countries))
         }
 
         latitude, err := strconv.ParseFloat(latitudeRaw, 64)

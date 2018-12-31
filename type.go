@@ -6,11 +6,12 @@ import (
 )
 
 type CityRecord struct {
-    Id                  string
-    Country             string
-    City                string
-    Population          uint64
-    Latitude, Longitude float64
+    Id         string  `json:"id"`
+    Country    string  `json:"country"`
+    City       string  `json:"city"`
+    Population uint64  `json:"population"`
+    Latitude   float64 `json:"latitude"`
+    Longitude  float64 `json:"longitude"`
 }
 
 func (cr CityRecord) String() string {
