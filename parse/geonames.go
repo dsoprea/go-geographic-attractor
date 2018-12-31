@@ -28,11 +28,13 @@ func BuildGeonamesCountryMapping(r io.Reader) (countries map[string]string, err 
             break
         }
 
-        if len(record) == 1 && record[0] == "" {
-            continue
-        }
+        if len(record) != 19 {
+            // A line that doesn't look like a record.
 
-        if len(record[0]) > 0 && record[0][0] == '#' {
+            continue
+        } else if record[0][0] == '#' {
+            // A commented line that was somehow interpreted as a record.
+
             continue
         }
 
@@ -99,8 +101,8 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
             // A line that doesn't look like a record.
 
             continue
-        } else if len(record[0]) > 0 && record[0][0] == '#' {
-            // A commented line that was somehow interpreted as a record..
+        } else if record[0][0] == '#' {
+            // A commented line that was somehow interpreted as a record.
 
             continue
         }
