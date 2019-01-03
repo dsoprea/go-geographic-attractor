@@ -55,9 +55,9 @@ func TestCityIndex_Load(t *testing.T) {
     ci := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
 
     ls := ci.Stats()
-    if ls.RecordAdds != 281 {
+    if ls.RecordAdds != 12273 {
         t.Fatalf("The number of added records is not correct: (%d)", ls.RecordAdds)
-    } else if ls.RecordUpdates != 2 {
+    } else if ls.RecordUpdates != 364 {
         t.Fatalf("The number of updated records is not correct: (%d)", ls.RecordUpdates)
     }
 }
@@ -103,7 +103,7 @@ func TestCityIndex_Nearest_MultipleWithinSameCity(t *testing.T) {
 
     if sourceName1 != "GeoNames" {
         t.Fatalf("Source-name for search (1) is not correct: [%s]", sourceName1)
-    } else if cr1.Id != "3573511" {
+    } else if cr1.Id != "3573374" {
         t.Fatalf("ID for search (1) is not correct: [%s]", cr1.Id)
     }
 
@@ -136,12 +136,8 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
 
     if sourceName != "GeoNames" {
         t.Fatalf("Source-name for search is not correct: [%s]", sourceName)
-    } else if cr.Id != "4990752" {
+    } else if cr.Id != "5014051" {
         t.Fatalf("ID for search is not correct: [%s]", cr.Id)
-    }
-
-    if len(visits) != 24 {
-        t.Fatalf("Number of visits not correct: (%d)", len(visits))
     }
 
     actual := make([]string, len(visits))
@@ -150,33 +146,20 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
     }
 
     expected := []string{
-        "8824c5ce97677fc5: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce97677fc4: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce97677fd: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce97677fc: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce97677f: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce97677c: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce97677: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce97674: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce9767: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce9764: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce977: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce974: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce97: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce94: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5ce9: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5cec: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5cf: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5cc: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5d: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>",
-        "8824c5c: CityRecord<ID=[5007808] COUNTRY=[United States] CITY=[City of Royal Oak] POP=(57236) LAT=(42.5084000000) LON=(-83.1538700000)>",
-        "8824c5: CityRecord<ID=[5007808] COUNTRY=[United States] CITY=[City of Royal Oak] POP=(57236) LAT=(42.5084000000) LON=(-83.1538700000)>",
-        "8824c4: CityRecord<ID=[5012643] COUNTRY=[United States] CITY=[City of Troy] POP=(80980) LAT=(42.5817300000) LON=(-83.1457500000)>",
-        "8824d: CityRecord<ID=[4990752] COUNTRY=[United States] CITY=[City of Detroit] POP=(713777) LAT=(42.3834100000) LON=(-83.1024100000)>",
-        "8824c: CityRecord<ID=[4990752] COUNTRY=[United States] CITY=[City of Detroit] POP=(713777) LAT=(42.3834100000) LON=(-83.1024100000)>",
+        "8824c5cc: CityRecord<ID=[4989005] COUNTRY=[United States] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000)>",
+        "8824c5d: CityRecord<ID=[4989005] COUNTRY=[United States] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000)>",
+        "8824c5c: CityRecord<ID=[4989005] COUNTRY=[United States] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000)>",
+        "8824c5: CityRecord<ID=[4989005] COUNTRY=[United States] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000)>",
+        "8824c4: CityRecord<ID=[5012639] COUNTRY=[United States] CITY=[Troy] POP=(83280) LAT=(42.6055900000) LON=(-83.1499300000)>",
+        "8824d: CityRecord<ID=[5014051] COUNTRY=[United States] CITY=[Warren] POP=(134056) LAT=(42.4904400000) LON=(-83.0130400000)>",
+        "8824c: CityRecord<ID=[5014051] COUNTRY=[United States] CITY=[Warren] POP=(134056) LAT=(42.4904400000) LON=(-83.0130400000)>",
     }
 
     if reflect.DeepEqual(actual, expected) == false {
+        for _, visit := range actual {
+            fmt.Printf("%s\n", visit)
+        }
+
         t.Fatalf("Visit history not correct.")
     }
 }
@@ -184,20 +167,16 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
 func TestCityIndex_Nearest_NearSmallAndNotNearLarge(t *testing.T) {
     ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
 
-    trentonCoordinates := []float64{42.135582, -83.1928263}
+    hillsdaleCoordinates := []float64{41.9275396, -84.6694791}
 
-    sourceName, visits, cr, err := ci.Nearest(trentonCoordinates[0], trentonCoordinates[1])
+    sourceName, visits, cr, err := ci.Nearest(hillsdaleCoordinates[0], hillsdaleCoordinates[1])
     log.PanicIf(err)
 
     // We should get Trenton in response (no large urban areas).
     if sourceName != "GeoNames" {
         t.Fatalf("Source-name for search is not correct: [%s]", sourceName)
-    } else if cr.Id != "5012524" {
+    } else if cr.Id != "4996107" {
         t.Fatalf("ID for search is not correct: [%s]", cr.Id)
-    }
-
-    if len(visits) != 7 {
-        t.Fatalf("Number of visits not correct: (%d)", len(visits))
     }
 
     actual := make([]string, len(visits))
@@ -206,16 +185,17 @@ func TestCityIndex_Nearest_NearSmallAndNotNearLarge(t *testing.T) {
     }
 
     expected := []string{
-        "883b3914: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
-        "883b391: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
-        "883b394: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
-        "883b39: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
-        "883b3c: CityRecord<ID=[5012524] COUNTRY=[United States] CITY=[City of Trenton] POP=(18853) LAT=(42.1394000000) LON=(-83.1930400000)>",
-        "883b3: CityRecord<ID=[4990516] COUNTRY=[United States] CITY=[City of Dearborn] POP=(98153) LAT=(42.3126900000) LON=(-83.2129400000)>",
-        "883b4: CityRecord<ID=[4990516] COUNTRY=[United States] CITY=[City of Dearborn] POP=(98153) LAT=(42.3126900000) LON=(-83.2129400000)>",
+        "883d73: CityRecord<ID=[4996107] COUNTRY=[United States] CITY=[Hillsdale] POP=(8163) LAT=(41.9200500000) LON=(-84.6305100000)>",
+        "883d74: CityRecord<ID=[4996107] COUNTRY=[United States] CITY=[Hillsdale] POP=(8163) LAT=(41.9200500000) LON=(-84.6305100000)>",
+        "883d7: CityRecord<ID=[4996107] COUNTRY=[United States] CITY=[Hillsdale] POP=(8163) LAT=(41.9200500000) LON=(-84.6305100000)>",
+        "883d4: CityRecord<ID=[4997384] COUNTRY=[United States] CITY=[Jackson] POP=(33133) LAT=(42.2458700000) LON=(-84.4013500000)>",
     }
 
     if reflect.DeepEqual(actual, expected) == false {
+        for _, visit := range actual {
+            fmt.Printf("%s\n", visit)
+        }
+
         t.Fatalf("Visit history not correct.")
     }
 }
@@ -272,36 +252,19 @@ func ExampleCityIndex_Nearest() {
     fmt.Printf("Longitude: %.10f\n", cr.Longitude)
 
     // Output:
-    // 8824c5ce97677fc5: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce97677fc4: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce97677fd: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce97677fc: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce97677f: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce97677c: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce97677: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce97674: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce9767: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce9764: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce977: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce974: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce97: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce94: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5ce9: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5cec: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5cf: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5cc: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5d: CityRecord<ID=[4989009] COUNTRY=[United States] CITY=[City of Clawson] POP=(11825) LAT=(42.5366700000) LON=(-83.1504100000)>
-    // 8824c5c: CityRecord<ID=[5007808] COUNTRY=[United States] CITY=[City of Royal Oak] POP=(57236) LAT=(42.5084000000) LON=(-83.1538700000)>
-    // 8824c5: CityRecord<ID=[5007808] COUNTRY=[United States] CITY=[City of Royal Oak] POP=(57236) LAT=(42.5084000000) LON=(-83.1538700000)>
-    // 8824c4: CityRecord<ID=[5012643] COUNTRY=[United States] CITY=[City of Troy] POP=(80980) LAT=(42.5817300000) LON=(-83.1457500000)>
-    // 8824d: CityRecord<ID=[4990752] COUNTRY=[United States] CITY=[City of Detroit] POP=(713777) LAT=(42.3834100000) LON=(-83.1024100000)>
-    // 8824c: CityRecord<ID=[4990752] COUNTRY=[United States] CITY=[City of Detroit] POP=(713777) LAT=(42.3834100000) LON=(-83.1024100000)>
+    // 8824c5cc: CityRecord<ID=[4989005] COUNTRY=[United States] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000)>
+    // 8824c5d: CityRecord<ID=[4989005] COUNTRY=[United States] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000)>
+    // 8824c5c: CityRecord<ID=[4989005] COUNTRY=[United States] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000)>
+    // 8824c5: CityRecord<ID=[4989005] COUNTRY=[United States] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000)>
+    // 8824c4: CityRecord<ID=[5012639] COUNTRY=[United States] CITY=[Troy] POP=(83280) LAT=(42.6055900000) LON=(-83.1499300000)>
+    // 8824d: CityRecord<ID=[5014051] COUNTRY=[United States] CITY=[Warren] POP=(134056) LAT=(42.4904400000) LON=(-83.0130400000)>
+    // 8824c: CityRecord<ID=[5014051] COUNTRY=[United States] CITY=[Warren] POP=(134056) LAT=(42.4904400000) LON=(-83.0130400000)>
     //
     // Source: GeoNames
-    // ID: 4990752
+    // ID: 5014051
     // Country: United States
-    // City: City of Detroit
-    // Population: 713777
-    // Latitude: 42.3834100000
-    // Longitude: -83.1024100000
+    // City: Warren
+    // Population: 134056
+    // Latitude: 42.4904400000
+    // Longitude: -83.0130400000
 }
