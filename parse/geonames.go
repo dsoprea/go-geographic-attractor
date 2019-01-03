@@ -120,7 +120,6 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
         latitudeRaw := record[4]
         longitudeRaw := record[5]
         featureClass := record[6]
-        featureCode := record[7]
         countryCode := record[8]
         populationRaw := record[14]
 
@@ -144,16 +143,8 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
         }
 
         // TODO(dustin): !! Move these out to a configurable filer.
-        if featureClass != "A" {
-            // It's not a political/government boundary.
-
-            continue
-        } else if featureCode == "ADM1" {
-            // It's a state/region/province (not a small-enough division).
-
-            continue
-        } else if featureCode == "ADM2" {
-            // It's a county-type division (in the US; not a small-enough division).
+        if featureClass != "P" {
+            // It's not a populated place.
 
             continue
         }
