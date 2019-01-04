@@ -120,6 +120,7 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
         latitudeRaw := record[4]
         longitudeRaw := record[5]
         featureClass := record[6]
+        featureCode := record[7]
         countryCode := record[8]
         populationRaw := record[14]
 
@@ -127,8 +128,6 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
         if countryCode == "" {
             continue
         }
-
-        // TODO(dustin): !! Consider that we might just take the last, populated administrative decision (of the ADM1, ADM2, ADM3, ADM4 feature-codes) rather than eliminating those of the first ones. The first ones will have different meanings in different countries but perhaps only ADM4, for example, may only be populated with actual cities? We think we might've observed a flaw in this proposed solution, but let's revisit in the future.
 
         dumpRecord := func() {
             fmt.Printf("\n")
@@ -142,9 +141,16 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
             fmt.Printf("\n")
         }
 
-        // TODO(dustin): !! Move these out to a configurable filer.
+        // TODO(dustin): !! Move these out to a configurable filter.
+
+        // REF: http://download.geonames.org/export/dump/featureCodes_en.txt
         if featureClass != "P" {
-            // It's not a populated place.
+            // It's not the class containing the codes referring to populated places.
+
+            continue
+        } else if featureCode != "PPL" {
+            // It's not an actual populated place itself (instead of some
+            // administrative divison of populated places).
 
             continue
         }
