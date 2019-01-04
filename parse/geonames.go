@@ -122,6 +122,7 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
         featureClass := record[6]
         featureCode := record[7]
         countryCode := record[8]
+        admin1Code := record[10]
         populationRaw := record[14]
 
         // In the case (name == "Commonwealth of Independent States").
@@ -184,12 +185,13 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
         log.PanicIf(err)
 
         cr := geoattractor.CityRecord{
-            Id:         geonamesId,
-            Country:    countryName,
-            City:       name,
-            Population: population,
-            Latitude:   latitude,
-            Longitude:  longitude,
+            Id:            geonamesId,
+            Country:       countryName,
+            ProvinceState: admin1Code,
+            City:          name,
+            Population:    population,
+            Latitude:      latitude,
+            Longitude:     longitude,
         }
 
         err = cityRecordCb(cr)
