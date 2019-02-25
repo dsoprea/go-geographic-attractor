@@ -8,6 +8,7 @@ import (
 	"github.com/jessevdk/go-flags"
 
 	"github.com/dsoprea/go-geographic-attractor"
+	"github.com/dsoprea/go-geographic-attractor/index"
 	"github.com/dsoprea/go-geographic-attractor/parse"
 )
 
@@ -16,6 +17,7 @@ type parameters struct {
 	CityDataFilepath    string   `short:"p" long:"city-data-filepath" description:"GeoNames city- and population-data file-path"`
 	IdList              []string `short:"i" long:"record-id" description:"ID of record to find (can be provided zero or more times)"`
 	CoordinatesList     []string `short:"C" long:"coordinates" description:"Exact latitude/longitude to search (e.g. '12.345,67.891'; can be provided zero or more times)"`
+	OnlyUrbanCenters    bool     `short:"u" long:"urban-centers" description:"Only print urban centers"`
 }
 
 var (
@@ -59,6 +61,12 @@ func main() {
 				err = log.Wrap(state.(error))
 			}
 		}()
+
+		// The parser implementation is expected to filter by everything but
+		// population.
+		if arguments.OnlyUrbanCenters == true && cr.Population < geoattractorindex.UrbanCenterMinimumPopulation {
+			return nil
+		}
 
 		hit := false
 		if arguments.IdList != nil {
