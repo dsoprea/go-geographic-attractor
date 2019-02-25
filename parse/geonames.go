@@ -149,14 +149,11 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
 
 		// TODO(dustin): !! Move these out to a configurable filter.
 
-		// REF: http://download.geonames.org/export/dump/featureCodes_en.txt
 		if featureClass != "P" {
-			// It's not the class containing the codes referring to populated places.
-
 			continue
-		} else if featureCode != "PPL" {
-			// It's not an actual populated place itself (instead of some
-			// administrative divison of populated places).
+		} else if featureCode != "PPLC" && strings.HasPrefix(featureCode, "PPLA") == false && featureCode != "PPL" && featureCode != "PPLX" && featureCode != "PPLL" {
+			// Filter for any populated place type. These all appear to depend on
+			// the size of the place and no particular classification applies.
 
 			continue
 		}
