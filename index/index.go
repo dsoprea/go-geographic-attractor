@@ -4,6 +4,7 @@ import (
     "errors"
     "fmt"
     "io"
+    "sort"
 
     "github.com/dsoprea/go-logging"
     "github.com/golang/geo/s2"
@@ -153,6 +154,16 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader) (er
 
     ci.stats.UnfilteredRecords = recordsCount
 
+    final := make([]string, len(ci.index))
+    i := 0
+    for token, _ := range ci.index {
+        final[i] = token
+        i++
+    }
+
+    ss := sort.StringSlice(final)
+    ss.Sort()
+
     return nil
 }
 
@@ -185,6 +196,8 @@ func (ci *CityIndex) Nearest(latitude, longitude float64) (sourceName string, vi
         log.Panicf("Determined cell not valid for coordinates: (%.10f), (%.10f)", latitude, longitude)
     }
 
+    // Successfully search for matches at progressively larger areas.
+
     var firstMatch *indexEntry
     var firstUrbanCenter *indexEntry
     visits = make([]VisitHistoryItem, 0)
@@ -192,6 +205,7 @@ func (ci *CityIndex) Nearest(latitude, longitude float64) (sourceName string, vi
         currentCellId := cellId.Parent(level)
 
         currentToken := currentCellId.ToToken()
+
         ie, found := ci.index[currentToken]
         if found == false {
             continue
