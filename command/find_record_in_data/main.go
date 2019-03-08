@@ -3,9 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/dsoprea/go-logging"
 	"github.com/jessevdk/go-flags"
+	"github.com/randomingenuity/go-utility/geographic"
 
 	"github.com/dsoprea/go-geographic-attractor"
 	"github.com/dsoprea/go-geographic-attractor/index"
@@ -53,7 +56,25 @@ func main() {
 
 	defer cityDataReadcloser.Close()
 
-	hasQualifiers := arguments.IdList != nil || arguments.CoordinatesList != nil
+	cellsList := make([]uint64, len(arguments.CoordinatesList))
+
+	for i, coordinatePhrase := range arguments.CoordinatesList {
+		parts := strings.Split(coordinatePhrase, ",")
+		if len(parts) != 2 {
+			log.Panicf("coordinate phrase is not exactly two parts: [%s]", coordinatePhrase)
+		}
+
+		latitute, err := strconv.ParseFloat(parts[0], 64)
+		log.PanicIf(err)
+
+		longitude, err := strconv.ParseFloat(parts[1], 64)
+		log.PanicIf(err)
+
+		cell := rigeo.S2CellFromCoordinates(latitute, longitude)
+		cellsList[i] = uint64(cell)
+	}
+
+	hasQualifiers := len(arguments.IdList) > 0 || len(cellsList) > 0
 
 	cb := func(cr geoattractor.CityRecord) (err error) {
 		defer func() {
@@ -79,10 +100,11 @@ func main() {
 		}
 
 		if hit == false && arguments.CoordinatesList != nil {
-			currentCoordinates := fmt.Sprintf("%.6f,%.6f", cr.Latitude, cr.Longitude)
+			currentCell := rigeo.S2CellFromCoordinates(cr.Latitude, cr.Longitude)
+			currentCellId := uint64(currentCell)
 
-			for _, coordinates := range arguments.CoordinatesList {
-				if coordinates == currentCoordinates {
+			for _, cellId := range cellsList {
+				if cellId == currentCellId {
 					hit = true
 					break
 				}
