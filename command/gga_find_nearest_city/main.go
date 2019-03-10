@@ -1,5 +1,7 @@
 package main
 
+// Tool to do test queries against indexed data.
+
 import (
 	"encoding/json"
 	"fmt"

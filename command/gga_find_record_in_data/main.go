@@ -1,5 +1,8 @@
 package main
 
+// Tool to help you Grok city data, where you might want to explore the data or
+// build more specifialized lists.
+
 import (
 	"fmt"
 	"os"
@@ -19,6 +22,7 @@ type parameters struct {
 	CountryDataFilepath string   `short:"c" long:"country-data-filepath" description:"GeoNames country-data file-path"`
 	CityDataFilepath    string   `short:"p" long:"city-data-filepath" description:"GeoNames city- and population-data file-path"`
 	IdList              []string `short:"i" long:"record-id" description:"ID of record to find (can be provided zero or more times)"`
+	NameList            []string `short:"n" long:"name" description:"Name of a place to to filter for (can be provided zero or more times)"`
 	CoordinatesList     []string `short:"C" long:"coordinates" description:"Exact latitude/longitude to search (e.g. '12.345,67.891'; can be provided zero or more times)"`
 	OnlyUrbanCenters    bool     `short:"u" long:"urban-centers" description:"Only print urban centers"`
 }
@@ -74,7 +78,7 @@ func main() {
 		cellsList[i] = uint64(cell)
 	}
 
-	hasQualifiers := len(arguments.IdList) > 0 || len(cellsList) > 0
+	hasQualifiers := len(arguments.IdList) > 0 || len(cellsList) > 0 || len(arguments.NameList) > 0
 
 	cb := func(cr geoattractor.CityRecord) (err error) {
 		defer func() {
@@ -99,12 +103,21 @@ func main() {
 			}
 		}
 
-		if hit == false && arguments.CoordinatesList != nil {
-			currentCell := rigeo.S2CellFromCoordinates(cr.Latitude, cr.Longitude)
+		if hit == false {
+			currentCell := cr.S2Cell()
 			currentCellId := uint64(currentCell)
 
 			for _, cellId := range cellsList {
 				if cellId == currentCellId {
+					hit = true
+					break
+				}
+			}
+		}
+
+		if hit == false {
+			for _, name := range arguments.NameList {
+				if strings.ToLower(cr.City) == strings.ToLower(name) {
 					hit = true
 					break
 				}

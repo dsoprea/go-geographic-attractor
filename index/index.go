@@ -171,8 +171,8 @@ func (ci *CityIndex) Nearest(latitude, longitude float64) (sourceName string, vi
 	visits = make([]VisitHistoryItem, 0)
 	for level := cellId.Level(); level >= MinimumLevelForUrbanCenterAttraction; level-- {
 		currentCellId := cellId.Parent(level)
-
 		currentToken := currentCellId.ToToken()
+
 		ie, found := ci.index[currentToken]
 		if found == false {
 			continue

@@ -4,6 +4,9 @@ import (
     "fmt"
     "io"
     "strconv"
+
+    "github.com/golang/geo/s2"
+    "github.com/randomingenuity/go-utility/geographic"
 )
 
 type CityRecord struct {
@@ -14,10 +17,12 @@ type CityRecord struct {
     Population    uint64  `json:"population"`
     Latitude      float64 `json:"latitude"`
     Longitude     float64 `json:"longitude"`
+    cell          s2.CellID
 }
 
 func (cr CityRecord) String() string {
-    return fmt.Sprintf("CityRecord<ID=[%s] COUNTRY=[%s] PROVINCE-OR-STATE=[%s] CITY=[%s] POP=(%d) LAT=(%.10f) LON=(%.10f)>", cr.Id, cr.Country, cr.ProvinceState, cr.City, cr.Population, cr.Latitude, cr.Longitude)
+    s2Token := cr.S2Cell().ToToken()
+    return fmt.Sprintf("CityRecord<ID=[%s] COUNTRY=[%s] PROVINCE-OR-STATE=[%s] CITY=[%s] POP=(%d) LAT=(%.10f) LON=(%.10f) S2=[%s]>", cr.Id, cr.Country, cr.ProvinceState, cr.City, cr.Population, cr.Latitude, cr.Longitude, s2Token)
 }
 
 func (cr CityRecord) CityAndProvinceState() string {
@@ -31,6 +36,14 @@ func (cr CityRecord) CityAndProvinceState() string {
     }
 
     return name
+}
+
+func (cr CityRecord) S2Cell() s2.CellID {
+    if uint64(cr.cell) == 0 {
+        cr.cell = rigeo.S2CellFromCoordinates(cr.Latitude, cr.Longitude)
+    }
+
+    return cr.cell
 }
 
 type CityRecordCb func(cr CityRecord) (err error)
