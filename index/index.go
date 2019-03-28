@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/dsoprea/go-logging"
+	"github.com/kellydunn/golang-geo"
 	"github.com/randomingenuity/go-utility/geographic"
 
 	"github.com/dsoprea/go-geographic-attractor"
@@ -19,6 +21,9 @@ const (
 	// UrbanCenterMinimumPopulation is the minimum population a city requires in
 	// order to be considered an urban/metropolitan center.
 	UrbanCenterMinimumPopulation = 100000
+
+	// Cache Nearest() lookups.
+	MaxNearestLruEntries = 100
 )
 
 var (
@@ -30,8 +35,8 @@ var (
 )
 
 type indexEntry struct {
-	Info  geoattractor.CityRecord
-	Level int
+	CityRecord geoattractor.CityRecord
+	Level      int
 
 	// LeafCellId is the full cell-ID for the current city regardless of which
 	// level we indexed it at.
@@ -40,7 +45,7 @@ type indexEntry struct {
 	SourceName string
 }
 
-type LoadStats struct {
+type AttractorStats struct {
 	// UnfilteredRecords is the total number of records that were seen in the
 	// file before any filtering was applied.
 	UnfilteredRecords int `json:"unfiltered_records_parsed"`
@@ -52,26 +57,48 @@ type LoadStats struct {
 	// RecordUpdates are the number of records that replaced existing ones
 	// (mutually exclusively with RecordAdds).
 	RecordUpdates int `json:"records_updated_in_index"`
+
+	// HaversineCalculations is how many times we've calculated distances
+	// between points.
+	HaversineCalculations int `json:"haversine_calculations"`
+
+	CachedNearestHits   int
+	CachedNearestMisses int
+	CachedNearestShifts int
 }
 
-func (ls LoadStats) String() string {
-	return fmt.Sprintf("LoadStats<UNFILTERED-RECORDS=(%d) ADDS=(%d) UPDATES=(%d)>", ls.UnfilteredRecords, ls.RecordAdds, ls.RecordUpdates)
+func (ls AttractorStats) String() string {
+	return fmt.Sprintf("AttractorStats<UNFILTERED-RECORDS=(%d) ADDS=(%d) UPDATES=(%d) CACHE-HITS=(%d) CACHE-MISSES=(%d) CACHE-SHIFTS=(%d)>", ls.UnfilteredRecords, ls.RecordAdds, ls.RecordUpdates, ls.CachedNearestHits, ls.CachedNearestMisses, ls.CachedNearestShifts)
+}
+
+type cachedNearestInfo struct {
+	sourceName string
+	visits     []VisitHistoryItem
+	cr         geoattractor.CityRecord
 }
 
 type CityIndex struct {
-	index map[string]*indexEntry
-	stats LoadStats
+	index                   map[string][]*indexEntry
+	stats                   AttractorStats
+	urbanCentersEncountered map[string]geoattractor.CityRecord
+
+	cachedNearest    map[string]cachedNearestInfo
+	cachedNearestLru sort.StringSlice
 }
 
 func NewCityIndex() *CityIndex {
-	index := make(map[string]*indexEntry)
+	index := make(map[string][]*indexEntry)
 
 	return &CityIndex{
-		index: index,
+		index:                   index,
+		urbanCentersEncountered: make(map[string]geoattractor.CityRecord),
+
+		cachedNearest:    make(map[string]cachedNearestInfo),
+		cachedNearestLru: make(sort.StringSlice, 0),
 	}
 }
 
-func (ci *CityIndex) Stats() LoadStats {
+func (ci *CityIndex) Stats() AttractorStats {
 	return ci.stats
 }
 
@@ -96,8 +123,8 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader) (er
 		token := cellId.ToToken()
 
 		ie := &indexEntry{
-			Info:  cr,
-			Level: cellId.Level(),
+			CityRecord: cr,
+			Level:      cellId.Level(),
 
 			// LeafCellId is the full cell-ID for the current city regardless of which
 			// level we indexed it at.
@@ -106,31 +133,27 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader) (er
 			SourceName: source.Name(),
 		}
 
-		// Store the leaf (full resolution) entry.
-		ci.index[token] = ie
-
 		// Index this cell at all levels only to within the maximum area we'd
 		// like to attract within. We assume that any area we visit will
 		// hopefully be within this amount of distance from an urban center,
 		// and, if not, at least one other city. Otherwise, that city won't be
 		// matched within the index.
-		for level := cellId.Level() - 1; level >= MinimumLevelForUrbanCenterAttraction; level-- {
+		for level := cellId.Level(); level >= MinimumLevelForUrbanCenterAttraction; level-- {
 			parentCellId := cellId.Parent(level)
 			parentToken := parentCellId.ToToken()
 
-			existingEntry, found := ci.index[parentToken]
+			if existingEntries, found := ci.index[parentToken]; found == true {
+				ci.index[parentToken] = append(existingEntries, ie)
 
-			if found == false || existingEntry.Info.Population < cr.Population {
+				// Technically, this represents colocations.
+				ci.stats.RecordUpdates++
+			} else {
 				// We either haven't seen this cell yet or the city we've
 				// previously indexed is smaller than the current one.
 
-				ci.index[parentToken] = ie
-
-				if found == true {
-					ci.stats.RecordUpdates++
-				} else {
-					ci.stats.RecordAdds++
-				}
+				// TODO(dustin): !! Determine if preallocating additional slots would optimize. We might do this only for smaller levels in which the chance of collision increases.
+				ci.index[parentToken] = []*indexEntry{ie}
+				ci.stats.RecordAdds++
 			}
 		}
 
@@ -146,8 +169,9 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader) (er
 }
 
 type VisitHistoryItem struct {
-	Token string
-	City  geoattractor.CityRecord
+	Token      string
+	City       geoattractor.CityRecord
+	SourceName string
 }
 
 // Nearest returns the nearest urban-center to the given coordinates, or, if
@@ -157,7 +181,7 @@ type VisitHistoryItem struct {
 // Also returns the name of the data-source that produced the final result and
 // the heirarchy of cities that surround the given coordinates up to the largest
 // area that we index for urban centers in.
-func (ci *CityIndex) Nearest(latitude, longitude float64) (sourceName string, visits []VisitHistoryItem, cr geoattractor.CityRecord, err error) {
+func (ci *CityIndex) Nearest(latitude, longitude float64, returnAllVisits bool) (sourceName string, visits []VisitHistoryItem, cr geoattractor.CityRecord, err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))
@@ -166,47 +190,143 @@ func (ci *CityIndex) Nearest(latitude, longitude float64) (sourceName string, vi
 
 	cellId := rigeo.S2CellFromCoordinates(latitude, longitude)
 
-	var firstMatch *indexEntry
-	var firstUrbanCenter *indexEntry
-	visits = make([]VisitHistoryItem, 0)
+	// Use the cell-ID rather than the coordinates to key by (eliminates
+	// precision and jitter issues).
+	cacheKey := fmt.Sprintf("%d,%v", cellId, returnAllVisits)
+	if cached, found := ci.cachedNearest[cacheKey]; found == true {
+		ci.stats.CachedNearestHits++
+		return cached.sourceName, cached.visits, cached.cr, nil
+	} else {
+		ci.stats.CachedNearestMisses++
+	}
+
+	// Efficiently collect all of the urban centers around our point using our
+	// S2 index.
+
+	if returnAllVisits == true {
+		visits = make([]VisitHistoryItem, 0)
+	}
+
+	visitsUrbanCenters := make([]VisitHistoryItem, 0)
+	nearestCities := make([]VisitHistoryItem, 0)
 	for level := cellId.Level(); level >= MinimumLevelForUrbanCenterAttraction; level-- {
 		currentCellId := cellId.Parent(level)
 		currentToken := currentCellId.ToToken()
 
-		ie, found := ci.index[currentToken]
+		entries, found := ci.index[currentToken]
 		if found == false {
 			continue
 		}
 
-		vhi := VisitHistoryItem{
-			Token: currentToken,
-			City:  ie.Info,
-		}
+		// If this is our first hit on one (or more cities, if more than one is
+		// very near).
+		isNearestCities := len(nearestCities) == 0
+		for _, ie := range entries {
+			vhi := VisitHistoryItem{
+				Token:      currentToken,
+				City:       ie.CityRecord,
+				SourceName: ie.SourceName,
+			}
 
-		visits = append(visits, vhi)
+			if returnAllVisits == true {
+				visits = append(visits, vhi)
+			}
 
-		if firstMatch == nil {
-			firstMatch = ie
-		}
+			if isNearestCities == true {
+				nearestCities = append(nearestCities, vhi)
+			}
 
-		// Keep track of the first city we encounter that we regard as a urban center.
-		if ie.Info.Population > UrbanCenterMinimumPopulation && firstUrbanCenter == nil {
-			firstUrbanCenter = ie
+			if ie.CityRecord.Population >= UrbanCenterMinimumPopulation {
+				visitsUrbanCenters = append(visitsUrbanCenters, vhi)
+
+				ci.urbanCentersEncountered[ie.CityRecord.String()] = ie.CityRecord
+			}
 		}
 	}
 
-	// We don't actually have anything indexed for any of the cells
-	// concentrically surrounding this location.
-	if firstMatch == nil && firstUrbanCenter == nil {
-		log.Panic(ErrNoNearestCity)
+	// This will produce a more accurate result than S2 can on its own because
+	// of how it cuts-up the world (e.g. we end-up not seeing cities or
+	// grabbing cities further away before considering those that are nearer).
+
+	var vhi VisitHistoryItem
+	if len(visitsUrbanCenters) > 0 {
+		vhi = ci.getNearestPoint(latitude, longitude, visitsUrbanCenters)
+	} else {
+		// If nothing else, just return the closest city found.
+
+		// We don't actually have anything indexed for any of the cells
+		// concentrically surrounding this location.
+		if len(nearestCities) == 0 {
+			log.Panic(ErrNoNearestCity)
+		}
+
+		vhi = ci.getNearestPoint(latitude, longitude, nearestCities)
 	}
 
-	// Return the first urban-center that we encountered as we visited the
-	// concentric cells (if any).
-	if firstUrbanCenter != nil && firstUrbanCenter.Info.Population >= UrbanCenterMinimumPopulation {
-		return firstUrbanCenter.SourceName, visits, firstUrbanCenter.Info, nil
+	cni := cachedNearestInfo{
+		sourceName: vhi.SourceName,
+		visits:     visits,
+		cr:         vhi.City,
 	}
 
-	// If nothing else, just return the city found closest to our location.
-	return firstMatch.SourceName, visits, firstMatch.Info, nil
+	// Prune an entry out of the cache.
+
+	if len(ci.cachedNearest) > MaxNearestLruEntries {
+		oldestKey := ci.cachedNearestLru[0]
+		ci.cachedNearestLru = ci.cachedNearestLru[1:]
+
+		delete(ci.cachedNearest, oldestKey)
+
+		ci.stats.CachedNearestShifts++
+	}
+
+	// Enroll in cache.
+
+	if _, found := ci.cachedNearest[cacheKey]; found == true {
+		i := ci.cachedNearestLru.Search(cacheKey)
+		if i >= len(ci.cachedNearestLru) {
+			log.Panicf("could not find existing cache entry in LRU")
+		}
+
+		if ci.cachedNearestLru[i] != cacheKey && i < len(ci.cachedNearestLru)-1 {
+			// Move to end.
+			ci.cachedNearestLru = append(ci.cachedNearestLru[:i], ci.cachedNearestLru[i+1], cacheKey)
+		}
+	} else {
+		ci.cachedNearest[cacheKey] = cni
+
+		ci.cachedNearestLru = append(ci.cachedNearestLru, cacheKey)
+		ci.cachedNearestLru.Sort()
+	}
+
+	return vhi.SourceName, visits, vhi.City, nil
+}
+
+func (ci *CityIndex) UrbanCentersEncountered() map[string]geoattractor.CityRecord {
+	return ci.urbanCentersEncountered
+}
+
+// getNearestPoint calculates the Haversine distance between the origin point
+// and all points in the list and returns the nearest.
+func (ci *CityIndex) getNearestPoint(originLatitude, originLongitude float64, queries []VisitHistoryItem) VisitHistoryItem {
+	origin := geo.NewPoint(originLatitude, originLongitude)
+
+	var closestDistance float64
+	var closestVhi VisitHistoryItem
+
+	empty := VisitHistoryItem{}
+
+	for _, vhi := range queries {
+		urbanP := geo.NewPoint(vhi.City.Latitude, vhi.City.Longitude)
+
+		distance := origin.GreatCircleDistance(urbanP)
+		ci.stats.HaversineCalculations++
+
+		if closestVhi == empty || distance < closestDistance {
+			closestDistance = distance
+			closestVhi = vhi
+		}
+	}
+
+	return closestVhi
 }

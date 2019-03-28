@@ -60,7 +60,7 @@ func main() {
 	err = ci.Load(gp, cityDataFile)
 	log.PanicIf(err)
 
-	sourceName, visits, cr, err := ci.Nearest(arguments.Latitude, arguments.Longitude)
+	sourceName, visits, cr, err := ci.Nearest(arguments.Latitude, arguments.Longitude, arguments.Verbose)
 	if err != nil {
 		if log.Is(err, geoattractorindex.ErrNoNearestCity) == true {
 			fmt.Printf("No nearest city found.\n")
