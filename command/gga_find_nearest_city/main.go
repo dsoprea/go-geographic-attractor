@@ -55,9 +55,9 @@ func main() {
 
 	defer cityDataFile.Close()
 
-	ci := geoattractorindex.NewCityIndex()
+	ci := geoattractorindex.NewCityIndex(0)
 
-	err = ci.Load(gp, cityDataFile)
+	err = ci.Load(gp, cityDataFile, nil)
 	log.PanicIf(err)
 
 	sourceName, visits, cr, err := ci.Nearest(arguments.Latitude, arguments.Longitude, arguments.Verbose)

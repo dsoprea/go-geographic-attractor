@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	// MinimumLevelForUrbanCenterAttraction is the lowest level that we'll
-	// compile the city with the highest population within.
-	MinimumLevelForUrbanCenterAttraction = 7
+	// DefaultMinimumLevelForUrbanCenterAttraction is the lowest level that
+	// we'll compile the city with the highest population within.
+	DefaultMinimumLevelForUrbanCenterAttraction = 7
 
 	// UrbanCenterMinimumPopulation is the minimum population a city requires in
 	// order to be considered an urban/metropolitan center.
@@ -84,17 +84,27 @@ type CityIndex struct {
 
 	cachedNearest    map[string]cachedNearestInfo
 	cachedNearestLru sort.StringSlice
+
+	minimumSearchLevel int
 }
 
-func NewCityIndex() *CityIndex {
+// NewCityIndex returns a `CityIndex` instance. `minimumSearchLevel` specifies
+// the smallest level (largest region) that we want to search for cities around
+// a certain point.
+func NewCityIndex(minimumSearchLevel int) *CityIndex {
+	if minimumSearchLevel == 0 {
+		minimumSearchLevel = DefaultMinimumLevelForUrbanCenterAttraction
+	}
+
 	index := make(map[string][]*indexEntry)
 
 	return &CityIndex{
 		index:                   index,
 		urbanCentersEncountered: make(map[string]geoattractor.CityRecord),
 
-		cachedNearest:    make(map[string]cachedNearestInfo),
-		cachedNearestLru: make(sort.StringSlice, 0),
+		cachedNearest:      make(map[string]cachedNearestInfo),
+		cachedNearestLru:   make(sort.StringSlice, 0),
+		minimumSearchLevel: minimumSearchLevel,
 	}
 }
 
@@ -105,12 +115,18 @@ func (ci *CityIndex) Stats() AttractorStats {
 // Load feeds the given city data into the index. Cities will be stored at
 // multiple levels. If/when we experience collisions, we'll keep whichever has
 // the larger population.
-func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader) (err error) {
+func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader, specificCityIds []string) (err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))
 		}
 	}()
+
+	var cityIdsFilter sort.StringSlice
+	if specificCityIds != nil {
+		cityIdsFilter = sort.StringSlice(specificCityIds)
+		cityIdsFilter.Sort()
+	}
 
 	cb := func(cr geoattractor.CityRecord) (err error) {
 		defer func() {
@@ -118,6 +134,14 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader) (er
 				err = log.Wrap(state.(error))
 			}
 		}()
+
+		// Apply the filter.
+		if cityIdsFilter != nil {
+			i := cityIdsFilter.Search(cr.Id)
+			if i >= len(cityIdsFilter) || cityIdsFilter[i] != cr.Id {
+				return nil
+			}
+		}
 
 		cellId := rigeo.S2CellFromCoordinates(cr.Latitude, cr.Longitude)
 		token := cellId.ToToken()
@@ -138,7 +162,7 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader) (er
 		// hopefully be within this amount of distance from an urban center,
 		// and, if not, at least one other city. Otherwise, that city won't be
 		// matched within the index.
-		for level := cellId.Level(); level >= MinimumLevelForUrbanCenterAttraction; level-- {
+		for level := cellId.Level(); level >= ci.minimumSearchLevel; level-- {
 			parentCellId := cellId.Parent(level)
 			parentToken := parentCellId.ToToken()
 
@@ -209,7 +233,7 @@ func (ci *CityIndex) Nearest(latitude, longitude float64, returnAllVisits bool) 
 
 	visitsUrbanCenters := make([]VisitHistoryItem, 0)
 	nearestCities := make([]VisitHistoryItem, 0)
-	for level := cellId.Level(); level >= MinimumLevelForUrbanCenterAttraction; level-- {
+	for level := cellId.Level(); level >= ci.minimumSearchLevel; level-- {
 		currentCellId := cellId.Parent(level)
 		currentToken := currentCellId.ToToken()
 
