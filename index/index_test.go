@@ -43,7 +43,7 @@ func getCityIndex(cityDataFilepath string) *CityIndex {
 
 	defer g.Close()
 
-	ci := NewCityIndex(0)
+	ci := NewTestCityIndex()
 
 	err = ci.Load(gp, g, nil)
 	log.PanicIf(err)
@@ -353,7 +353,7 @@ func ExampleCityIndex_Nearest() {
 
 	defer g.Close()
 
-	ci := NewCityIndex(0)
+	ci := NewTestCityIndex()
 
 	err = ci.Load(gp, g, nil)
 	log.PanicIf(err)
@@ -400,7 +400,7 @@ func ExampleCityIndex_Nearest() {
 }
 
 func TestCityIndex_getNearestPoint1(t *testing.T) {
-	ci := NewCityIndex(0)
+	ci := NewTestCityIndex()
 
 	originLatitude := 27.2974891
 	originLongitude := -81.3871491
@@ -436,7 +436,7 @@ func TestCityIndex_getNearestPoint1(t *testing.T) {
 }
 
 func TestCityIndex_getNearestPoint2(t *testing.T) {
-	ci := NewCityIndex(0)
+	ci := NewTestCityIndex()
 
 	originLatitude := 26.00
 	originLongitude := -80.50
@@ -472,7 +472,7 @@ func TestCityIndex_getNearestPoint2(t *testing.T) {
 }
 
 func TestCityIndex_getNearestPoint_OutOfOrder(t *testing.T) {
-	ci := NewCityIndex(0)
+	ci := NewTestCityIndex()
 
 	originLatitude := 27.2974891
 	originLongitude := -81.3871491

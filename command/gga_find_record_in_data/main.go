@@ -89,7 +89,7 @@ func main() {
 
 		// The parser implementation is expected to filter by everything but
 		// population.
-		if arguments.OnlyUrbanCenters == true && cr.Population < geoattractorindex.UrbanCenterMinimumPopulation {
+		if arguments.OnlyUrbanCenters == true && cr.Population < geoattractorindex.DefaultUrbanCenterMinimumPopulation {
 			return nil
 		}
 

@@ -14,14 +14,6 @@ import (
 )
 
 const (
-	// DefaultMinimumLevelForUrbanCenterAttraction is the lowest level that
-	// we'll compile the city with the highest population within.
-	DefaultMinimumLevelForUrbanCenterAttraction = 7
-
-	// UrbanCenterMinimumPopulation is the minimum population a city requires in
-	// order to be considered an urban/metropolitan center.
-	UrbanCenterMinimumPopulation = 100000
-
 	// Cache Nearest() lookups.
 	MaxNearestLruEntries = 100
 )
@@ -85,26 +77,24 @@ type CityIndex struct {
 	cachedNearest    map[string]cachedNearestInfo
 	cachedNearestLru sort.StringSlice
 
-	minimumSearchLevel int
+	minimumSearchLevel           int
+	urbanCenterMinimumPopulation int
 }
 
 // NewCityIndex returns a `CityIndex` instance. `minimumSearchLevel` specifies
 // the smallest level (largest region) that we want to search for cities around
 // a certain point.
-func NewCityIndex(minimumSearchLevel int) *CityIndex {
-	if minimumSearchLevel == 0 {
-		minimumSearchLevel = DefaultMinimumLevelForUrbanCenterAttraction
-	}
-
+func NewCityIndex(minimumSearchLevel int, urbanCenterMinimumPopulation int) *CityIndex {
 	index := make(map[string][]*indexEntry)
 
 	return &CityIndex{
 		index:                   index,
 		urbanCentersEncountered: make(map[string]geoattractor.CityRecord),
 
-		cachedNearest:      make(map[string]cachedNearestInfo),
-		cachedNearestLru:   make(sort.StringSlice, 0),
-		minimumSearchLevel: minimumSearchLevel,
+		cachedNearest:                make(map[string]cachedNearestInfo),
+		cachedNearestLru:             make(sort.StringSlice, 0),
+		minimumSearchLevel:           minimumSearchLevel,
+		urbanCenterMinimumPopulation: urbanCenterMinimumPopulation,
 	}
 }
 
@@ -260,7 +250,7 @@ func (ci *CityIndex) Nearest(latitude, longitude float64, returnAllVisits bool) 
 				nearestCities = append(nearestCities, vhi)
 			}
 
-			if ie.CityRecord.Population >= UrbanCenterMinimumPopulation {
+			if int(ie.CityRecord.Population) >= ci.urbanCenterMinimumPopulation {
 				visitsUrbanCenters = append(visitsUrbanCenters, vhi)
 
 				ci.urbanCentersEncountered[ie.CityRecord.String()] = ie.CityRecord

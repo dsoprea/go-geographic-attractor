@@ -55,7 +55,7 @@ func main() {
 
 	defer cityDataFile.Close()
 
-	ci := geoattractorindex.NewCityIndex(0)
+	ci := geoattractorindex.NewCityIndex(geoattractorindex.DefaultMinimumLevelForUrbanCenterAttraction, geoattractorindex.DefaultUrbanCenterMinimumPopulation)
 
 	err = ci.Load(gp, cityDataFile, nil)
 	log.PanicIf(err)

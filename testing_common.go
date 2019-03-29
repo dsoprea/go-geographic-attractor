@@ -1,13 +1,13 @@
 package geoattractor
 
 import (
-	"path"
+    "path"
 )
 
 var (
-	testAssetsPath string
+    testAssetsPath string
 )
 
 func init() {
-	testAssetsPath = path.Join(appPath, "test", "asset")
+    testAssetsPath = path.Join(appPath, "test", "asset")
 }
