@@ -253,7 +253,7 @@ func (ci *CityIndex) Nearest(latitude, longitude float64, returnAllVisits bool) 
 			if int(ie.CityRecord.Population) >= ci.urbanCenterMinimumPopulation {
 				visitsUrbanCenters = append(visitsUrbanCenters, vhi)
 
-				ci.urbanCentersEncountered[ie.CityRecord.String()] = ie.CityRecord
+				ci.urbanCentersEncountered[ie.CityRecord.Id] = ie.CityRecord
 			}
 		}
 	}
