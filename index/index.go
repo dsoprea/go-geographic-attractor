@@ -24,6 +24,7 @@ var (
 
 var (
 	ErrNoNearestCity = errors.New("no nearest city")
+	ErrNotFound      = errors.New("not found")
 )
 
 type indexEntry struct {
@@ -71,6 +72,7 @@ type cachedNearestInfo struct {
 
 type CityIndex struct {
 	index                   map[string][]*indexEntry
+	idIndex                 map[string]geoattractor.CityRecord
 	stats                   AttractorStats
 	urbanCentersEncountered map[string]geoattractor.CityRecord
 
@@ -85,10 +87,10 @@ type CityIndex struct {
 // the smallest level (largest region) that we want to search for cities around
 // a certain point.
 func NewCityIndex(minimumSearchLevel int, urbanCenterMinimumPopulation int) *CityIndex {
-	index := make(map[string][]*indexEntry)
-
 	return &CityIndex{
-		index:                   index,
+		index:   make(map[string][]*indexEntry),
+		idIndex: make(map[string]geoattractor.CityRecord),
+
 		urbanCentersEncountered: make(map[string]geoattractor.CityRecord),
 
 		cachedNearest:                make(map[string]cachedNearestInfo),
@@ -146,6 +148,9 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader, spe
 
 			SourceName: source.Name(),
 		}
+
+		idPhrase := IdPhrase(source.Name(), cr.Id)
+		ci.idIndex[idPhrase] = cr
 
 		// Index this cell at all levels only to within the maximum area we'd
 		// like to attract within. We assume that any area we visit will
@@ -343,4 +348,17 @@ func (ci *CityIndex) getNearestPoint(originLatitude, originLongitude float64, qu
 	}
 
 	return closestVhi
+}
+
+func (ci *CityIndex) GetById(sourceName, id string) (cr geoattractor.CityRecord, err error) {
+	idPhrase := IdPhrase(sourceName, id)
+	if cr, found := ci.idIndex[idPhrase]; found == true {
+		return cr, nil
+	}
+
+	return geoattractor.CityRecord{}, ErrNotFound
+}
+
+func IdPhrase(sourceName, id string) string {
+	return fmt.Sprintf("%s,%s", sourceName, id)
 }
