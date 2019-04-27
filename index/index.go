@@ -1,11 +1,18 @@
 package geoattractorindex
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
+	"strings"
 
+	"encoding/gob"
+	"io/ioutil"
+
+	"github.com/akrylysov/pogreb"
 	"github.com/dsoprea/go-logging"
 	"github.com/kellydunn/golang-geo"
 	"github.com/randomingenuity/go-utility/geographic"
@@ -25,6 +32,11 @@ var (
 var (
 	ErrNoNearestCity = errors.New("no nearest city")
 	ErrNotFound      = errors.New("not found")
+)
+
+var (
+	CityIndexKeyGroup = []string{"attractor", "index", "city_index"}
+	FineTokenKeyGroup = []string{"attractor", "index", "fine_token_index"}
 )
 
 type indexEntry struct {
@@ -81,27 +93,217 @@ type CityIndex struct {
 
 	minimumSearchLevel           int
 	urbanCenterMinimumPopulation int
+
+	kvFilepath string
+	kv         *pogreb.DB
+
+	isTestKv bool
 }
 
 // NewCityIndex returns a `CityIndex` instance. `minimumSearchLevel` specifies
 // the smallest level (largest region) that we want to search for cities around
 // a certain point.
-func NewCityIndex(minimumSearchLevel int, urbanCenterMinimumPopulation int) *CityIndex {
-	return &CityIndex{
-		index:   make(map[string][]*indexEntry),
-		idIndex: make(map[string]geoattractor.CityRecord),
+func NewCityIndex(kvFilepath string, minimumSearchLevel int, urbanCenterMinimumPopulation int) *CityIndex {
+	defer func() {
+		if state := recover(); state != nil {
+			log.Panic(state.(error))
+		}
+	}()
 
+	isTestKv := false
+	if kvFilepath == "" {
+		f, err := ioutil.TempFile("", "")
+		log.PanicIf(err)
+
+		defer f.Close()
+
+		kvFilepath = f.Name()
+		isTestKv = true
+
+		indexLogger.Debugf(nil, "A temporary KV will be used: [%s]", kvFilepath)
+	}
+
+	return &CityIndex{
 		urbanCentersEncountered: make(map[string]geoattractor.CityRecord),
 
 		cachedNearest:                make(map[string]cachedNearestInfo),
 		cachedNearestLru:             make(sort.StringSlice, 0),
 		minimumSearchLevel:           minimumSearchLevel,
 		urbanCenterMinimumPopulation: urbanCenterMinimumPopulation,
+
+		kvFilepath: kvFilepath,
+		isTestKv:   isTestKv,
+	}
+}
+
+func (ci *CityIndex) Close() {
+	indexLogger.Debugf(nil, "Closing city-index.")
+
+	if ci.kv == nil {
+		indexLogger.Debugf(nil, "City-index not open so not closing.")
+
+		return
+	}
+
+	err := ci.kv.Close()
+	ci.kv = nil
+
+	log.PanicIf(err)
+
+	if ci.isTestKv == true {
+		indexLogger.Debugf(nil, "Temporary KV is being cleaned-up: [%s]", ci.kvFilepath)
+
+		err := os.Remove(ci.kvFilepath)
+		log.PanicIf(err)
 	}
 }
 
 func (ci *CityIndex) Stats() AttractorStats {
 	return ci.stats
+}
+
+type kvKey struct {
+	group []string
+	name  string
+}
+
+func (kk kvKey) Key() string {
+	if kk.group == nil || len(kk.group) == 0 {
+		log.Panicf("key group is empty: NAME=[%s]", kk.name)
+	}
+
+	if kk.name == "" {
+		log.Panicf("key name is empty: GROUP=%v", kk.group)
+	}
+
+	return fmt.Sprintf("%s.%s", strings.Join(kk.group, "."), kk.name)
+}
+
+func (kk kvKey) KeyBytes() []byte {
+	key := kk.Key()
+	return []byte(key)
+}
+
+func (ci *CityIndex) kvPut(key kvKey, data interface{}) (err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
+	if ci.kv == nil {
+		indexLogger.Debugf(nil, "Opening city-index (kvPut).")
+
+		kv, err := pogreb.Open(ci.kvFilepath, nil)
+		log.PanicIf(err)
+
+		ci.kv = kv
+	}
+
+	b := new(bytes.Buffer)
+	e := gob.NewEncoder(b)
+
+	err = e.Encode(data)
+	log.PanicIf(err)
+
+	dataEncoded := b.Bytes()
+
+	kb := key.KeyBytes()
+
+	err = ci.kv.Put(kb, dataEncoded)
+	log.PanicIf(err)
+
+	return nil
+}
+
+func (ci *CityIndex) kvGet(key kvKey, data interface{}) (err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
+	if ci.kv == nil {
+		indexLogger.Debugf(nil, "Opening city-index (kvGet).")
+
+		kv, err := pogreb.Open(ci.kvFilepath, nil)
+		log.PanicIf(err)
+
+		ci.kv = kv
+	}
+
+	kb := key.KeyBytes()
+
+	dataEncoded, err := ci.kv.Get(kb)
+	log.PanicIf(err)
+
+	if dataEncoded == nil {
+		return ErrNotFound
+	}
+
+	b := new(bytes.Buffer)
+
+	_, err = b.Write(dataEncoded)
+	log.PanicIf(err)
+
+	d := gob.NewDecoder(b)
+
+	err = d.Decode(data)
+	log.PanicIf(err)
+
+	return nil
+}
+
+func (ci *CityIndex) setRecord(token string, ie indexEntry) (err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
+	// TODO(dustin): Add test.
+
+	fineTokenKk := kvKey{FineTokenKeyGroup, token}
+
+	records := make([]indexEntry, 0)
+	err = ci.kvGet(fineTokenKk, &records)
+
+	isFaulted := false
+
+	if err != nil {
+		if err != ErrNotFound {
+			log.Panic(err)
+		}
+
+		// We haven't seen this cell yet.
+		ci.stats.RecordAdds++
+
+		records = []indexEntry{ie}
+		isFaulted = true
+	} else {
+		// Colocation.
+		ci.stats.RecordUpdates++
+
+		hit := false
+		for _, existingIe := range records {
+			if ie.CityRecord.Id == existingIe.CityRecord.Id && ie.SourceName == existingIe.SourceName {
+				hit = true
+				break
+			}
+		}
+
+		if hit == false {
+			records = append(records, ie)
+			isFaulted = true
+		}
+	}
+
+	if isFaulted == true {
+		err = ci.kvPut(fineTokenKk, records)
+		log.PanicIf(err)
+	}
+
+	return nil
 }
 
 // Load feeds the given city data into the index. Cities will be stored at
@@ -138,7 +340,7 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader, spe
 		cellId := rigeo.S2CellFromCoordinates(cr.Latitude, cr.Longitude)
 		token := cellId.ToToken()
 
-		ie := &indexEntry{
+		ie := indexEntry{
 			CityRecord: cr,
 			Level:      cellId.Level(),
 
@@ -150,30 +352,27 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader, spe
 		}
 
 		idPhrase := IdPhrase(source.Name(), cr.Id)
-		ci.idIndex[idPhrase] = cr
+
+		indexKk := kvKey{CityIndexKeyGroup, idPhrase}
+
+		err = ci.kvPut(indexKk, cr)
+		log.PanicIf(err)
 
 		// Index this cell at all levels only to within the maximum area we'd
 		// like to attract within. We assume that any area we visit will
 		// hopefully be within this amount of distance from an urban center,
 		// and, if not, at least one other city. Otherwise, that city won't be
 		// matched within the index.
-		for level := cellId.Level(); level >= ci.minimumSearchLevel; level-- {
+
+		err = ci.setRecord(token, ie)
+		log.PanicIf(err)
+
+		for level := cellId.Level() - 1; level >= ci.minimumSearchLevel; level-- {
 			parentCellId := cellId.Parent(level)
 			parentToken := parentCellId.ToToken()
 
-			if existingEntries, found := ci.index[parentToken]; found == true {
-				ci.index[parentToken] = append(existingEntries, ie)
-
-				// Technically, this represents colocations.
-				ci.stats.RecordUpdates++
-			} else {
-				// We either haven't seen this cell yet or the city we've
-				// previously indexed is smaller than the current one.
-
-				// TODO(dustin): !! Determine if preallocating additional slots would optimize. We might do this only for smaller levels in which the chance of collision increases.
-				ci.index[parentToken] = []*indexEntry{ie}
-				ci.stats.RecordAdds++
-			}
+			err := ci.setRecord(parentToken, ie)
+			log.PanicIf(err)
 		}
 
 		return nil
@@ -232,9 +431,17 @@ func (ci *CityIndex) Nearest(latitude, longitude float64, returnAllVisits bool) 
 		currentCellId := cellId.Parent(level)
 		currentToken := currentCellId.ToToken()
 
-		entries, found := ci.index[currentToken]
-		if found == false {
-			continue
+		fineTokenKk := kvKey{FineTokenKeyGroup, currentToken}
+
+		entries := make([]indexEntry, 0)
+		err = ci.kvGet(fineTokenKk, &entries)
+
+		if err != nil {
+			if err == ErrNotFound {
+				continue
+			}
+
+			log.Panic(err)
 		}
 
 		// If this is our first hit on one (or more cities, if more than one is
@@ -351,9 +558,20 @@ func (ci *CityIndex) getNearestPoint(originLatitude, originLongitude float64, qu
 }
 
 func (ci *CityIndex) GetById(sourceName, id string) (cr geoattractor.CityRecord, err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
 	idPhrase := IdPhrase(sourceName, id)
-	if cr, found := ci.idIndex[idPhrase]; found == true {
+	indexKk := kvKey{CityIndexKeyGroup, idPhrase}
+
+	err = ci.kvGet(indexKk, &cr)
+	if err == nil {
 		return cr, nil
+	} else if err != ErrNotFound {
+		log.Panic(err)
 	}
 
 	return geoattractor.CityRecord{}, ErrNotFound

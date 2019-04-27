@@ -15,12 +15,14 @@ import (
 )
 
 type parameters struct {
-	CountryDataFilepath string  `short:"c" long:"country-data-filepath" description:"GeoNames country-data file-path"`
-	CityDataFilepath    string  `short:"p" long:"city-data-filepath" description:"GeoNames city- and population-data file-path"`
-	Latitude            float64 `short:"a" long:"latitude" description:"Latitude" required:"true"`
-	Longitude           float64 `short:"o" long:"longitude" description:"Longitude" required:"true"`
-	Verbose             bool    `short:"v" long:"verbose" description:"Print logging"`
-	Json                bool    `short:"j" long:"json" description:"Print as JSON"`
+	CountryDataFilepath  string `short:"c" long:"country-data-filepath" description:"GeoNames country-data file-path"`
+	CityDataFilepath     string `short:"p" long:"city-data-filepath" description:"GeoNames city- and population-data file-path"`
+	CityDatabaseFilepath string `long:"city-db-filepath" description:"File-path of city database. Will be created if does not exist. If not provided a temporary one is used."`
+
+	Latitude  float64 `short:"a" long:"latitude" description:"Latitude" required:"true"`
+	Longitude float64 `short:"o" long:"longitude" description:"Longitude" required:"true"`
+	Verbose   bool    `short:"v" long:"verbose" description:"Print logging"`
+	Json      bool    `short:"j" long:"json" description:"Print as JSON"`
 }
 
 var (
@@ -55,7 +57,7 @@ func main() {
 
 	defer cityDataFile.Close()
 
-	ci := geoattractorindex.NewCityIndex(geoattractorindex.DefaultMinimumLevelForUrbanCenterAttraction, geoattractorindex.DefaultUrbanCenterMinimumPopulation)
+	ci := geoattractorindex.NewCityIndex(arguments.CityDatabaseFilepath, geoattractorindex.DefaultMinimumLevelForUrbanCenterAttraction, geoattractorindex.DefaultUrbanCenterMinimumPopulation)
 
 	err = ci.Load(gp, cityDataFile, nil)
 	log.PanicIf(err)

@@ -13,7 +13,7 @@ import (
 	"github.com/dsoprea/go-geographic-attractor/parse"
 )
 
-func getCityIndex(cityDataFilepath string) *CityIndex {
+func getCityIndex(cityDataFilepath string) (*CityIndex, string) {
 	defer func() {
 		if state := recover(); state != nil {
 			err := log.Wrap(state.(error))
@@ -43,23 +43,17 @@ func getCityIndex(cityDataFilepath string) *CityIndex {
 
 	defer g.Close()
 
-	ci := NewTestCityIndex()
+	ci, kvFilepath := NewTestCityIndex()
 
 	err = ci.Load(gp, g, nil)
 	log.PanicIf(err)
 
-	return ci
-}
+	// Now, close and reopen, so we can rely on the DB.
+	ci.Close()
 
-func TestCityIndex_Load(t *testing.T) {
-	ci := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
+	ci = NewCityIndex(kvFilepath, DefaultMinimumLevelForUrbanCenterAttraction, DefaultUrbanCenterMinimumPopulation)
 
-	ls := ci.Stats()
-	if ls.RecordAdds != 12776 {
-		t.Fatalf("The number of added records is not correct: (%d)", ls.RecordAdds)
-	} else if ls.RecordUpdates != 1624 {
-		t.Fatalf("The number of updated records is not correct: (%d)", ls.RecordUpdates)
-	}
+	return ci, kvFilepath
 }
 
 func dumpVisits(visits []VisitHistoryItem) {
@@ -77,7 +71,10 @@ func TestCityIndex_Nearest_Miss(t *testing.T) {
 		}
 	}()
 
-	ci := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
+	ci, kvFilepath := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
 
 	lasvegasCoordinates := []float64{36.175, -115.136389}
 
@@ -92,7 +89,10 @@ func TestCityIndex_Nearest_Miss(t *testing.T) {
 // TestCityIndex_Nearest_MultipleWithinSameCity just tests that multiple local
 // points resolve to that same city. It's not profound.
 func TestCityIndex_Nearest_MultipleWithinSameCity(t *testing.T) {
-	ci := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
+	ci, kvFilepath := getCityIndex(path.Join(appPath, "index", "test", "asset", "allCountries.txt.head"))
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
 
 	alainCoordinates := []float64{24.1916700000, 55.7605600000}
 	alburaimiCoordinates := []float64{24.269806, 55.831959}
@@ -127,7 +127,10 @@ func TestCityIndex_Nearest_MultipleWithinSameCity(t *testing.T) {
 }
 
 func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
-	ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
+	ci, kvFilepath := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
 
 	clawsonCoordinates := []float64{42.53667, -83.15041}
 
@@ -147,12 +150,8 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
 
 	expected := []string{
 		"8824c5cc: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
-		"8824c5cc: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
-		"8824c5d: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
 		"8824c5d: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
 		"8824c5c: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
-		"8824c5c: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
-		"8824c5: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
 		"8824c5: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
 		"8824c4: CityRecord<ID=[5012639] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Troy] POP=(83280) LAT=(42.6055900000) LON=(-83.1499300000) S2=[8824c3c40a768751]>",
 		"8824c4: CityRecord<ID=[4985891] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Beverly Hills] POP=(10267) LAT=(42.5239200000) LON=(-83.2232600000) S2=[8824c7c6cfdc46d7]>",
@@ -160,8 +159,6 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
 		"8824c4: CityRecord<ID=[4986429] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Bloomfield Hills] POP=(4004) LAT=(42.5836400000) LON=(-83.2454900000) S2=[8824c75476e7ce3b]>",
 		"8824c4: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
 		"8824c4: CityRecord<ID=[5007402] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Rochester Hills] POP=(73424) LAT=(42.6583700000) LON=(-83.1499300000) S2=[8824c209e91136a5]>",
-		"8824c4: CityRecord<ID=[5012639] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Troy] POP=(83280) LAT=(42.6055900000) LON=(-83.1499300000) S2=[8824c3c40a768751]>",
-		"8824c4: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
 		"8824d: CityRecord<ID=[5012639] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Troy] POP=(83280) LAT=(42.6055900000) LON=(-83.1499300000) S2=[8824c3c40a768751]>",
 		"8824d: CityRecord<ID=[4985744] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Berkley] POP=(15268) LAT=(42.5030900000) LON=(-83.1835400000) S2=[8824c8a0f8f0fbdf]>",
 		"8824d: CityRecord<ID=[4985891] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Beverly Hills] POP=(10267) LAT=(42.5239200000) LON=(-83.2232600000) S2=[8824c7c6cfdc46d7]>",
@@ -189,10 +186,8 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
 		"8824d: CityRecord<ID=[5007804] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Royal Oak] POP=(59008) LAT=(42.4894800000) LON=(-83.1446500000) S2=[8824cf426afeadeb]>",
 		"8824d: CityRecord<ID=[5010636] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Southfield] POP=(73156) LAT=(42.4733700000) LON=(-83.2218700000) S2=[8824c84e9cc57315]>",
 		"8824d: CityRecord<ID=[5011148] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Sterling Heights] POP=(132052) LAT=(42.5803100000) LON=(-83.0302000000) S2=[8824dc7b8dc14d09]>",
-		"8824d: CityRecord<ID=[5012639] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Troy] POP=(83280) LAT=(42.6055900000) LON=(-83.1499300000) S2=[8824c3c40a768751]>",
 		"8824d: CityRecord<ID=[5013061] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Utica] POP=(4942) LAT=(42.6261400000) LON=(-83.0335400000) S2=[8824dda71da1f19b]>",
 		"8824d: CityRecord<ID=[5014051] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Warren] POP=(134056) LAT=(42.4904400000) LON=(-83.0130400000) S2=[8824d0a18dc66fa9]>",
-		"8824d: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
 		"8824c: CityRecord<ID=[5012639] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Troy] POP=(83280) LAT=(42.6055900000) LON=(-83.1499300000) S2=[8824c3c40a768751]>",
 		"8824c: CityRecord<ID=[4984067] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Almont] POP=(2723) LAT=(42.9205800000) LON=(-83.0449300000) S2=[8824f9addab97707]>",
 		"8824c: CityRecord<ID=[4984565] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Auburn Hills] POP=(22672) LAT=(42.6875300000) LON=(-83.2341000000) S2=[8824eac14916a94d]>",
@@ -247,7 +242,6 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
 		"8824c: CityRecord<ID=[5010636] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Southfield] POP=(73156) LAT=(42.4733700000) LON=(-83.2218700000) S2=[8824c84e9cc57315]>",
 		"8824c: CityRecord<ID=[5011148] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Sterling Heights] POP=(132052) LAT=(42.5803100000) LON=(-83.0302000000) S2=[8824dc7b8dc14d09]>",
 		"8824c: CityRecord<ID=[5011761] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Sylvan Lake] POP=(1785) LAT=(42.6114200000) LON=(-83.3285500000) S2=[8824be9883cd97db]>",
-		"8824c: CityRecord<ID=[5012639] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Troy] POP=(83280) LAT=(42.6055900000) LON=(-83.1499300000) S2=[8824c3c40a768751]>",
 		"8824c: CityRecord<ID=[5013061] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Utica] POP=(4942) LAT=(42.6261400000) LON=(-83.0335400000) S2=[8824dda71da1f19b]>",
 		"8824c: CityRecord<ID=[5013961] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Walled Lake] POP=(7110) LAT=(42.5378100000) LON=(-83.4810500000) S2=[8824a594107a3e33]>",
 		"8824c: CityRecord<ID=[5014051] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Warren] POP=(134056) LAT=(42.4904400000) LON=(-83.0130400000) S2=[8824d0a18dc66fa9]>",
@@ -255,7 +249,6 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
 		"8824c: CityRecord<ID=[5015351] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Wixom] POP=(13746) LAT=(42.5247600000) LON=(-83.5363300000) S2=[8824a89d9d87dce1]>",
 		"8824c: CityRecord<ID=[5015416] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Wolverine Lake] POP=(4312) LAT=(42.5567000000) LON=(-83.4738300000) S2=[8824a5ade7b1c3f5]>",
 		"8824c: CityRecord<ID=[7259621] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[West Bloomfield Township] POP=(64690) LAT=(42.5689100000) LON=(-83.3835600000) S2=[8824bb093a6f74c9]>",
-		"8824c: CityRecord<ID=[4989005] COUNTRY=[United States] PROVINCE-OR-STATE=[MI] CITY=[Clawson] POP=(12015) LAT=(42.5333700000) LON=(-83.1463200000) S2=[8824c5c88b28e955]>",
 	}
 
 	if reflect.DeepEqual(actual, expected) == false {
@@ -268,7 +261,10 @@ func TestCityIndex_Nearest_HitOnSmallAndAttractToLarge(t *testing.T) {
 }
 
 func TestCityIndex_Nearest_NearSmallAndNotNearLarge(t *testing.T) {
-	ci := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
+	ci, kvFilepath := getCityIndex(path.Join(testAssetsPath, "allCountries.txt.detroit_area_handpicked"))
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
 
 	hillsdaleCoordinates := []float64{41.9275396, -84.6694791}
 
@@ -353,7 +349,10 @@ func ExampleCityIndex_Nearest() {
 
 	defer g.Close()
 
-	ci := NewTestCityIndex()
+	ci, kvFilepath := NewTestCityIndex()
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
 
 	err = ci.Load(gp, g, nil)
 	log.PanicIf(err)
@@ -400,7 +399,10 @@ func ExampleCityIndex_Nearest() {
 }
 
 func TestCityIndex_getNearestPoint1(t *testing.T) {
-	ci := NewTestCityIndex()
+	ci, kvFilepath := NewTestCityIndex()
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
 
 	originLatitude := 27.2974891
 	originLongitude := -81.3871491
@@ -436,7 +438,10 @@ func TestCityIndex_getNearestPoint1(t *testing.T) {
 }
 
 func TestCityIndex_getNearestPoint2(t *testing.T) {
-	ci := NewTestCityIndex()
+	ci, kvFilepath := NewTestCityIndex()
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
 
 	originLatitude := 26.00
 	originLongitude := -80.50
@@ -472,7 +477,10 @@ func TestCityIndex_getNearestPoint2(t *testing.T) {
 }
 
 func TestCityIndex_getNearestPoint_OutOfOrder(t *testing.T) {
-	ci := NewTestCityIndex()
+	ci, kvFilepath := NewTestCityIndex()
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
 
 	originLatitude := 27.2974891
 	originLongitude := -81.3871491
@@ -504,5 +512,46 @@ func TestCityIndex_getNearestPoint_OutOfOrder(t *testing.T) {
 	vhi := ci.getNearestPoint(originLatitude, originLongitude, queries)
 	if vhi.Token != "aa" {
 		t.Fatalf("Result not correct: %v\n", vhi)
+	}
+}
+
+func TestCityIndex_kVPut(t *testing.T) {
+	ci, kvFilepath := NewTestCityIndex()
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
+
+	value := float64(11.22)
+
+	err := ci.kvPut(kvKey{[]string{"aa", "bb"}, "cc"}, value)
+	log.PanicIf(err)
+}
+
+type IndexTestStruct struct {
+	Inner float64
+}
+
+func TestCityIndex_kVGet(t *testing.T) {
+	ci, kvFilepath := NewTestCityIndex()
+
+	defer os.Remove(kvFilepath)
+	defer ci.Close()
+
+	value := IndexTestStruct{
+		11.22,
+	}
+
+	err := ci.kvPut(kvKey{[]string{"aa", "bb"}, "cc"}, value)
+	log.PanicIf(err)
+
+	recovered := IndexTestStruct{
+		11.22,
+	}
+
+	err = ci.kvGet(kvKey{[]string{"aa", "bb"}, "cc"}, &recovered)
+	log.PanicIf(err)
+
+	if recovered != value {
+		t.Fatalf("Recovered value is not the same: %v != %v", recovered, value)
 	}
 }

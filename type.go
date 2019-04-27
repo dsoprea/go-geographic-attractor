@@ -17,7 +17,7 @@ type CityRecord struct {
     Population    uint64  `json:"population"`
     Latitude      float64 `json:"latitude"`
     Longitude     float64 `json:"longitude"`
-    cell          s2.CellID
+    Cell          s2.CellID
 }
 
 func (cr CityRecord) String() string {
@@ -39,11 +39,11 @@ func (cr CityRecord) CityAndProvinceState() string {
 }
 
 func (cr CityRecord) S2Cell() s2.CellID {
-    if uint64(cr.cell) == 0 {
-        cr.cell = rigeo.S2CellFromCoordinates(cr.Latitude, cr.Longitude)
+    if uint64(cr.Cell) == 0 {
+        cr.Cell = rigeo.S2CellFromCoordinates(cr.Latitude, cr.Longitude)
     }
 
-    return cr.cell
+    return cr.Cell
 }
 
 type CityRecordCb func(cr CityRecord) (err error)
