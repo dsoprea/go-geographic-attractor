@@ -515,7 +515,7 @@ func TestCityIndex_getNearestPoint_OutOfOrder(t *testing.T) {
 	}
 }
 
-func TestCityIndex_kVPut(t *testing.T) {
+func TestCityIndex_kvPut(t *testing.T) {
 	ci, kvFilepath := NewTestCityIndex()
 
 	defer os.Remove(kvFilepath)
@@ -531,7 +531,7 @@ type IndexTestStruct struct {
 	Inner float64
 }
 
-func TestCityIndex_kVGet(t *testing.T) {
+func TestCityIndex_kvGet(t *testing.T) {
 	ci, kvFilepath := NewTestCityIndex()
 
 	defer os.Remove(kvFilepath)
