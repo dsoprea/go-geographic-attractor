@@ -16,6 +16,7 @@ import (
 	"github.com/dsoprea/go-logging"
 	"github.com/kellydunn/golang-geo"
 	"github.com/randomingenuity/go-utility/geographic"
+	"gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/dsoprea/go-geographic-attractor"
 )
@@ -39,7 +40,7 @@ var (
 	FineTokenKeyGroup = []string{"attractor", "index", "fine_token_index"}
 )
 
-type indexEntry struct {
+type IndexEntry struct {
 	CityRecord geoattractor.CityRecord
 	Level      int
 
@@ -83,7 +84,7 @@ type cachedNearestInfo struct {
 }
 
 type CityIndex struct {
-	index                   map[string][]*indexEntry
+	index                   map[string][]*IndexEntry
 	idIndex                 map[string]geoattractor.CityRecord
 	stats                   AttractorStats
 	urbanCentersEncountered map[string]geoattractor.CityRecord
@@ -98,6 +99,10 @@ type CityIndex struct {
 	kv         *pogreb.DB
 
 	isTestKv bool
+
+	totalRecords int
+
+	beVerbose bool
 }
 
 // NewCityIndex returns a `CityIndex` instance. `minimumSearchLevel` specifies
@@ -136,16 +141,31 @@ func NewCityIndex(kvFilepath string, minimumSearchLevel int, urbanCenterMinimumP
 	}
 }
 
-func (ci *CityIndex) Close() {
+func (ci *CityIndex) SetVerbose(flag bool) {
+	ci.beVerbose = flag
+}
+
+// SetTotalRecords enables us to provide progress information if the number of
+// records is already known.
+func (ci *CityIndex) SetTotalRecords(count int) {
+	ci.totalRecords = count
+}
+
+func (ci *CityIndex) Close() (err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
 	indexLogger.Debugf(nil, "Closing city-index.")
 
 	if ci.kv == nil {
 		indexLogger.Debugf(nil, "City-index not open so not closing.")
-
 		return
 	}
 
-	err := ci.kv.Close()
+	err = ci.kv.Close()
 	ci.kv = nil
 
 	log.PanicIf(err)
@@ -156,6 +176,8 @@ func (ci *CityIndex) Close() {
 		err := os.Remove(ci.kvFilepath)
 		log.PanicIf(err)
 	}
+
+	return nil
 }
 
 func (ci *CityIndex) Stats() AttractorStats {
@@ -184,7 +206,32 @@ func (kk kvKey) KeyBytes() []byte {
 	return []byte(key)
 }
 
-func (ci *CityIndex) kvPut(key kvKey, data interface{}) (err error) {
+func (kk kvKey) EqualsGroup(g []string) bool {
+	if len(kk.group) != len(g) {
+		return false
+	}
+
+	for i, partName := range g {
+		if partName != kk.group[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func newKvKeyFromBytes(key []byte) kvKey {
+	s := string(key)
+	parts := strings.Split(s, ".")
+
+	len_ := len(parts)
+	return kvKey{
+		group: parts[:len_-1],
+		name:  parts[len_-1],
+	}
+}
+
+func (ci *CityIndex) kvInit() (err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))
@@ -192,13 +239,93 @@ func (ci *CityIndex) kvPut(key kvKey, data interface{}) (err error) {
 	}()
 
 	if ci.kv == nil {
-		indexLogger.Debugf(nil, "Opening city-index (kvPut).")
+		indexLogger.Debugf(nil, "Opening city-index.")
 
 		kv, err := pogreb.Open(ci.kvFilepath, nil)
 		log.PanicIf(err)
 
 		ci.kv = kv
 	}
+
+	return nil
+}
+
+func (ci *CityIndex) KvCount() (count int, err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
+	err = ci.kvInit()
+	log.PanicIf(err)
+
+	countRaw := ci.kv.Count()
+
+	return int(countRaw), nil
+}
+
+func (ci *CityIndex) KvDump() (err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
+	err = ci.kvInit()
+	log.PanicIf(err)
+
+	ii := ci.kv.Items()
+
+	for {
+		keyEncoded, dataEncoded, err := ii.Next()
+		if err != nil {
+			if err == pogreb.ErrIterationDone {
+				break
+			}
+
+			log.PanicIf(err)
+		}
+
+		kk := newKvKeyFromBytes(keyEncoded)
+
+		b := bytes.NewBuffer(dataEncoded)
+		gd := gob.NewDecoder(b)
+
+		if kk.EqualsGroup(CityIndexKeyGroup) == true {
+			cr := geoattractor.CityRecord{}
+
+			err = gd.Decode(&cr)
+			log.PanicIf(err)
+
+			fmt.Printf("%s (CityRecord): %v\n", kk.Key(), cr)
+		} else if kk.EqualsGroup(FineTokenKeyGroup) == true {
+			records := make([]IndexEntry, 0)
+
+			err = gd.Decode(&records)
+			log.PanicIf(err)
+
+			fmt.Printf("%s (IndexEntry):\n", kk.Key())
+			for _, record := range records {
+				fmt.Printf("  %s (%d)\n", record.CityRecord, record.Level)
+			}
+		} else {
+			fmt.Printf("Unrecognized key group: [%s]\n", kk.group)
+		}
+	}
+
+	return nil
+}
+
+func (ci *CityIndex) kvPut(key kvKey, data interface{}) (err error) {
+	defer func() {
+		if state := recover(); state != nil {
+			err = log.Wrap(state.(error))
+		}
+	}()
+
+	err = ci.kvInit()
+	log.PanicIf(err)
 
 	b := new(bytes.Buffer)
 	e := gob.NewEncoder(b)
@@ -223,14 +350,8 @@ func (ci *CityIndex) kvGet(key kvKey, data interface{}) (err error) {
 		}
 	}()
 
-	if ci.kv == nil {
-		indexLogger.Debugf(nil, "Opening city-index (kvGet).")
-
-		kv, err := pogreb.Open(ci.kvFilepath, nil)
-		log.PanicIf(err)
-
-		ci.kv = kv
-	}
+	err = ci.kvInit()
+	log.PanicIf(err)
 
 	kb := key.KeyBytes()
 
@@ -254,7 +375,7 @@ func (ci *CityIndex) kvGet(key kvKey, data interface{}) (err error) {
 	return nil
 }
 
-func (ci *CityIndex) setRecord(token string, ie indexEntry) (err error) {
+func (ci *CityIndex) setRecord(token string, ie IndexEntry) (err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))
@@ -265,7 +386,7 @@ func (ci *CityIndex) setRecord(token string, ie indexEntry) (err error) {
 
 	fineTokenKk := kvKey{FineTokenKeyGroup, token}
 
-	records := make([]indexEntry, 0)
+	records := make([]IndexEntry, 0)
 	err = ci.kvGet(fineTokenKk, &records)
 
 	isFaulted := false
@@ -278,7 +399,7 @@ func (ci *CityIndex) setRecord(token string, ie indexEntry) (err error) {
 		// We haven't seen this cell yet.
 		ci.stats.RecordAdds++
 
-		records = []indexEntry{ie}
+		records = []IndexEntry{ie}
 		isFaulted = true
 	} else {
 		// Colocation.
@@ -309,18 +430,39 @@ func (ci *CityIndex) setRecord(token string, ie indexEntry) (err error) {
 // Load feeds the given city data into the index. Cities will be stored at
 // multiple levels. If/when we experience collisions, we'll keep whichever has
 // the larger population.
-func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader, specificCityIds []string) (err error) {
+func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader, specificCityIds, specificCountryNames []string) (err error) {
 	defer func() {
 		if state := recover(); state != nil {
 			err = log.Wrap(state.(error))
 		}
 	}()
 
-	var cityIdsFilter sort.StringSlice
+	var cityIdsFilter map[string]struct{}
 	if specificCityIds != nil {
-		cityIdsFilter = sort.StringSlice(specificCityIds)
-		cityIdsFilter.Sort()
+		cityIdsFilter = make(map[string]struct{})
+		for _, id := range specificCityIds {
+			cityIdsFilter[id] = struct{}{}
+		}
 	}
+
+	var countriesFilter map[string]struct{}
+	if specificCountryNames != nil {
+		countriesFilter = make(map[string]struct{})
+		for _, name := range specificCountryNames {
+			countriesFilter[name] = struct{}{}
+		}
+	}
+
+	var loadBar *pb.ProgressBar
+	if ci.beVerbose == true {
+		loadBar = pb.New(ci.totalRecords)
+		loadBar.Prefix("Loading cities ")
+		loadBar.SetMaxWidth(100)
+		loadBar.Start()
+	}
+
+	cityFilterHits := make(map[string]int)
+	countryFilterHits := make(map[string]int)
 
 	cb := func(cr geoattractor.CityRecord) (err error) {
 		defer func() {
@@ -329,18 +471,40 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader, spe
 			}
 		}()
 
+		if loadBar != nil {
+			loadBar.Increment()
+		}
+
 		// Apply the filter.
+
 		if cityIdsFilter != nil {
-			i := cityIdsFilter.Search(cr.Id)
-			if i >= len(cityIdsFilter) || cityIdsFilter[i] != cr.Id {
+			_, found := cityIdsFilter[cr.Id]
+			if found == false {
 				return nil
+			}
+
+			if _, found := cityFilterHits[cr.Id]; found == true {
+				cityFilterHits[cr.Id]++
+			} else {
+				cityFilterHits[cr.Id] = 1
+			}
+		} else if countriesFilter != nil {
+			_, found := countriesFilter[cr.Country]
+			if found == false {
+				return nil
+			}
+
+			if _, found := countryFilterHits[cr.Country]; found == true {
+				countryFilterHits[cr.Country]++
+			} else {
+				countryFilterHits[cr.Country] = 1
 			}
 		}
 
 		cellId := rigeo.S2CellFromCoordinates(cr.Latitude, cr.Longitude)
 		token := cellId.ToToken()
 
-		ie := indexEntry{
+		ie := IndexEntry{
 			CityRecord: cr,
 			Level:      cellId.Level(),
 
@@ -381,7 +545,73 @@ func (ci *CityIndex) Load(source geoattractor.CityRecordSource, r io.Reader, spe
 	recordsCount, err := source.Parse(r, cb)
 	log.PanicIf(err)
 
+	if loadBar != nil {
+		loadBar.Finish()
+	}
+
 	ci.stats.UnfilteredRecords = recordsCount
+
+	if len(cityFilterHits) > 0 && ci.beVerbose == true {
+		fmt.Printf("\n")
+		fmt.Printf("City load-filter hits:\n")
+		fmt.Printf("\n")
+
+		// TODO(dustin): !! Sort this.
+		for cityId, tally := range cityFilterHits {
+			fmt.Printf("> %s (%d)\n", cityId, tally)
+		}
+
+		fmt.Printf("\n")
+
+		misses := make([]string, 0)
+		for _, cityId := range specificCityIds {
+			if _, found := cityFilterHits[cityId]; found == false {
+				misses = append(misses, cityId)
+			}
+		}
+
+		if len(misses) > 0 {
+			fmt.Printf("One or more of the filtered cities was not found in the city data:\n")
+			fmt.Printf("\n")
+
+			for _, cityId := range misses {
+				fmt.Printf("> %s\n", cityId)
+			}
+
+			fmt.Printf("\n")
+		}
+	}
+
+	if len(countryFilterHits) > 0 && ci.beVerbose == true {
+		fmt.Printf("\n")
+		fmt.Printf("Country load-filter hits:\n")
+		fmt.Printf("\n")
+
+		// TODO(dustin): !! Sort this.
+		for name, tally := range countryFilterHits {
+			fmt.Printf("> %s (%d)\n", name, tally)
+		}
+
+		fmt.Printf("\n")
+
+		misses := make([]string, 0)
+		for _, name := range specificCountryNames {
+			if _, found := countryFilterHits[name]; found == false {
+				misses = append(misses, name)
+			}
+		}
+
+		if len(misses) > 0 {
+			fmt.Printf("One or more of the filtered countries was not found in the city data:\n")
+			fmt.Printf("\n")
+
+			for _, name := range misses {
+				fmt.Printf("> %s\n", name)
+			}
+
+			fmt.Printf("\n")
+		}
+	}
 
 	return nil
 }
@@ -433,7 +663,7 @@ func (ci *CityIndex) Nearest(latitude, longitude float64, returnAllVisits bool) 
 
 		fineTokenKk := kvKey{FineTokenKeyGroup, currentToken}
 
-		entries := make([]indexEntry, 0)
+		entries := make([]IndexEntry, 0)
 		err = ci.kvGet(fineTokenKk, &entries)
 
 		if err != nil {
@@ -579,4 +809,8 @@ func (ci *CityIndex) GetById(sourceName, id string) (cr geoattractor.CityRecord,
 
 func IdPhrase(sourceName, id string) string {
 	return fmt.Sprintf("%s,%s", sourceName, id)
+}
+
+func init() {
+	gob.Register(IndexEntry{})
 }

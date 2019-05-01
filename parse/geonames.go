@@ -78,8 +78,6 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
 			break
 		}
 
-		recordsCount++
-
 		// From http://download.geonames.org/export/dump:
 		//
 		//  0: geonameid         : integer id of record in geonames database
@@ -171,33 +169,37 @@ func (gp *GeonamesParser) Parse(r io.Reader, cityRecordCb geoattractor.CityRecor
 			continue
 		}
 
-		// If we get here, we have a tangible population value.
+		recordsCount++
 
-		countryName, found := gp.countries[countryCode]
-		if found == false {
-			dumpRecord()
+		if cityRecordCb != nil {
+			// If we get here, we have a tangible population value.
 
-			log.Panicf("could not resolve country with code [%s] ((%d) countries known)", countryCode, len(gp.countries))
+			countryName, found := gp.countries[countryCode]
+			if found == false {
+				dumpRecord()
+
+				log.Panicf("could not resolve country with code [%s] ((%d) countries known)", countryCode, len(gp.countries))
+			}
+
+			latitude, err := strconv.ParseFloat(latitudeRaw, 64)
+			log.PanicIf(err)
+
+			longitude, err := strconv.ParseFloat(longitudeRaw, 64)
+			log.PanicIf(err)
+
+			cr := geoattractor.CityRecord{
+				Id:            geonamesId,
+				Country:       countryName,
+				ProvinceState: admin1Code,
+				City:          name,
+				Population:    population,
+				Latitude:      latitude,
+				Longitude:     longitude,
+			}
+
+			err = cityRecordCb(cr)
+			log.PanicIf(err)
 		}
-
-		latitude, err := strconv.ParseFloat(latitudeRaw, 64)
-		log.PanicIf(err)
-
-		longitude, err := strconv.ParseFloat(longitudeRaw, 64)
-		log.PanicIf(err)
-
-		cr := geoattractor.CityRecord{
-			Id:            geonamesId,
-			Country:       countryName,
-			ProvinceState: admin1Code,
-			City:          name,
-			Population:    population,
-			Latitude:      latitude,
-			Longitude:     longitude,
-		}
-
-		err = cityRecordCb(cr)
-		log.PanicIf(err)
 	}
 
 	return recordsCount, nil

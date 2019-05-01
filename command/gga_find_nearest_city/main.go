@@ -59,7 +59,7 @@ func main() {
 
 	ci := geoattractorindex.NewCityIndex(arguments.CityDatabaseFilepath, geoattractorindex.DefaultMinimumLevelForUrbanCenterAttraction, geoattractorindex.DefaultUrbanCenterMinimumPopulation)
 
-	err = ci.Load(gp, cityDataFile, nil)
+	err = ci.Load(gp, cityDataFile, nil, nil)
 	log.PanicIf(err)
 
 	sourceName, visits, cr, err := ci.Nearest(arguments.Latitude, arguments.Longitude, arguments.Verbose)

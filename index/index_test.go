@@ -45,7 +45,7 @@ func getCityIndex(cityDataFilepath string) (*CityIndex, string) {
 
 	ci, kvFilepath := NewTestCityIndex()
 
-	err = ci.Load(gp, g, nil)
+	err = ci.Load(gp, g, nil, nil)
 	log.PanicIf(err)
 
 	// Now, close and reopen, so we can rely on the DB.
@@ -354,7 +354,7 @@ func ExampleCityIndex_Nearest() {
 	defer os.Remove(kvFilepath)
 	defer ci.Close()
 
-	err = ci.Load(gp, g, nil)
+	err = ci.Load(gp, g, nil, nil)
 	log.PanicIf(err)
 
 	// Do the query.

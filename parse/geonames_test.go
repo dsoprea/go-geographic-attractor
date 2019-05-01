@@ -78,7 +78,7 @@ func TestGeonamesParser_Parse(t *testing.T) {
 	recordsCount, err := gp.Parse(f, cb)
 	log.PanicIf(err)
 
-	if recordsCount != 10000 {
+	if recordsCount != 35 {
 		t.Fatalf("Number of records read is not correct: (%d)", recordsCount)
 	}
 

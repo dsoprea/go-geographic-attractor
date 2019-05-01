@@ -5,6 +5,8 @@ import (
     "io"
     "strconv"
 
+    "encoding/gob"
+
     "github.com/golang/geo/s2"
     "github.com/randomingenuity/go-utility/geographic"
 )
@@ -51,4 +53,8 @@ type CityRecordCb func(cr CityRecord) (err error)
 type CityRecordSource interface {
     Parse(r io.Reader, cb CityRecordCb) (recordsCount int, err error)
     Name() string
+}
+
+func init() {
+    gob.Register(CityRecord{})
 }
